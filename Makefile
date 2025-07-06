@@ -6,7 +6,7 @@ help: ## Show this help message
 venv: ## Create a virtual environment
 	python3 -m venv venv
 	./venv/bin/pip install -U pip setuptools
-	./venv/bin/pip install -r requirements.txt
+	./venv/bin/pip install -e ".[dev,test]"
 
 .PHONY: lint
 lint: lint-yaml lint-actions ## Run all linters
@@ -34,10 +34,29 @@ lint-actions: ## Lint GitHub Actions workflows
 format: venv ## Format code with ruff
 	./venv/bin/ruff format .
 
+.PHONY: test
+test: venv ## Run tests
+	@echo "Running tests..."
+	./venv/bin/pytest -v
+	@echo "Tests completed!"
+
+.PHONY: test-integration
+test-integration: venv ## Run integration tests (requires gh CLI and GitHub auth)
+	@echo "Running integration tests..."
+	./venv/bin/pytest -v -m integration
+	@echo "Integration tests completed!"
+
+.PHONY: test-all
+test-all: venv ## Run all tests including integration
+	@echo "Running all tests..."
+	./venv/bin/pytest -v
+	@echo "All tests completed!"
+
 clean: ## Clean up temporary files
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -delete
 	find . -type d -name ".pytest_cache" -delete
 	rm -rf .ruff_cache/
 	rm -rf venv/
+	rm -rf cache/
 	rm -f actionlint
