@@ -9,6 +9,7 @@ This repository contains GitHub Actions workflows to automate common development
   - [2. Keeper: triage label protection](#2-triage-label-protection) ✅ **Implemented**
   - [3. Keeper: stale PR detector](#3-keeper-stale-pr-detector) ✅ **Implemented**
   - [4. Keeper: auto-label release and backport](#4-keeper-auto-label-release-and-backport) ✅ **Implemented**
+  - [5. Keeper: closed PR label cleanup](#5-keeper-closed-pr-label-cleanup) 📝 **Planned**
 - [Workflow Structure](#workflow-structure)
 - [Implementation Plan](#implementation-plan)
 - [Prerequisites](#prerequisites)
@@ -22,7 +23,8 @@ This repository contains GitHub Actions workflows to automate common development
 ├── keeper-auto-add-triage-label.yml       # Auto-adds triage label to new issues/PRs
 ├── keeper-triage-label-protection.yml     # Protects triage label from removal
 ├── keeper-stale-pr-detector.yml           # Marks inactive PRs as stale
-└── keeper-auto-label-release-backport.yml # Auto-labels PRs based on YAML frontmatter
+├── keeper-auto-label-release-backport.yml # Auto-labels PRs based on YAML frontmatter
+└── keeper-closed-pr-label-cleanup.yml     # Removes "ready for review" label from closed PRs
 ```
 
 ## How to use them
@@ -157,6 +159,30 @@ flowchart LR
     C -->|No| E[✅ Skip]
     D --> F[Add Labels]
     F --> G[✅ Complete]
+```
+
+### 5. Keeper: closed PR label cleanup
+Automatically removes the "ready for review" label from closed pull requests during nightly runs.
+
+**File**: `.github/workflows/keeper-closed-pr-label-cleanup.yml`
+
+**Trigger**: `schedule` (nightly cron job)
+
+**Behavior**:
+- Runs nightly to check all closed pull requests
+- Identifies closed PRs that still have the "ready for review" label
+- Removes the "ready for review" label from these PRs
+- Helps maintain clean label states by removing review-related labels that are no longer relevant
+- Only processes PRs that are in closed state (merged or closed without merge)
+
+```mermaid
+flowchart LR
+    A[Nightly Cron Job] --> B[Check Closed PRs]
+    B --> C{Has 'ready for review' label?}
+    C -->|Yes| D[Remove Label]
+    C -->|No| E[Skip PR]
+    D --> F[✅ Complete]
+    E --> F
 ```
 
 ## Implementation Plan
