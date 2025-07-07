@@ -118,11 +118,26 @@ class GitHubTestManager:
             "git", "push", "-u", "origin", branch_name
         ], cwd=repo_path, check=True)
     
+    def _get_repo_suffix(self, repo_path: Path) -> str:
+        """Generate a suffix based on the local repository path."""
+        # Get the relative path from cache_dir to help identify the repo
+        try:
+            relative_path = repo_path.relative_to(self.cache_dir)
+            # Use the directory name as suffix
+            return f"[{relative_path.name}]"
+        except ValueError:
+            # If repo_path is not under cache_dir, use the directory name
+            return f"[{repo_path.name}]"
+    
     def create_pr(self, repo_path: Path, title: str, body: str, head: str, base: str = "main") -> str:
         """Create a pull request and return the PR number."""
+        # Add suffix to title based on local repository path
+        suffix = self._get_repo_suffix(repo_path)
+        title_with_suffix = f"{title} {suffix}"
+        
         pr_result = subprocess.run([
             "gh", "pr", "create",
-            "--title", title,
+            "--title", title_with_suffix,
             "--body", body,
             "--head", head,
             "--base", base
@@ -134,9 +149,13 @@ class GitHubTestManager:
     
     def create_issue(self, repo_path: Path, title: str, body: str) -> str:
         """Create an issue and return the issue number."""
+        # Add suffix to title based on local repository path
+        suffix = self._get_repo_suffix(repo_path)
+        title_with_suffix = f"{title} {suffix}"
+        
         issue_result = subprocess.run([
             "gh", "issue", "create",
-            "--title", title,
+            "--title", title_with_suffix,
             "--body", body
         ], cwd=repo_path, capture_output=True, text=True, check=True)
         
@@ -242,7 +261,7 @@ class GitHubFixtures:
     def test_repo(self, github_manager_class):
         """Create a temporary repository that uses the existing repo-automations as remote."""
         # Create unique repository name with timestamp
-        repo_name = f"test-repo-automations-{int(time.time())}"
+        repo_name = f"test-repo-{int(time.time())}"
         
         # Create temporary local repository
         repo_path = github_manager_class.create_temp_repo(repo_name)
