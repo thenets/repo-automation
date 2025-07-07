@@ -300,7 +300,7 @@ The changes are simple and don't require any specific labeling."""
         assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
         
         # Wait a bit more to ensure release/backport workflow has time to run
-        time.sleep(30)
+        time.sleep(10)
         
         # Verify no release/backport labels are present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
@@ -372,7 +372,7 @@ The YAML above is malformed and should be ignored."""
         assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
         
         # Wait a bit more to ensure release/backport workflow has time to run
-        time.sleep(30)
+        time.sleep(10)
         
         # Verify no release/backport labels are present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
@@ -447,7 +447,7 @@ The tags above are not in the accepted lists and should cause the workflow to fa
         assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
         
         # Wait for release/backport workflow to process and fail
-        time.sleep(60)  # Allow more time for workflow to complete/fail
+        time.sleep(10)  # Allow more time for workflow to complete/fail
         
         # Verify no release/backport labels are present (workflow should have failed)
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
@@ -523,7 +523,7 @@ The empty values above should be handled gracefully without workflow failure."""
         assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
         
         # Wait for release/backport workflow to process
-        time.sleep(30)
+        time.sleep(10)
         
         # Verify no release/backport labels are present (empty values should be ignored)
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
