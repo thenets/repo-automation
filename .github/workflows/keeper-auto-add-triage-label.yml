@@ -1,5 +1,5 @@
 ---
-name: Auto-Add Triage Label
+name: Keeper: auto-add triage label
 
 'on':
   issues:
