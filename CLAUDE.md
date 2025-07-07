@@ -21,6 +21,18 @@ This repository contains GitHub Actions workflows for automating repository mana
 ```bash
 # Validate syntax
 make lint-actions
+
+# Run specific test class
+./venv/bin/pytest test/test_triage_auto_add.py::TestStalePRDetector
+
+# Run specific individual test
+./venv/bin/pytest test/test_triage_auto_add.py::TestStalePRDetector::test_stale_pr_detection_manual_trigger -v
+
+# Run tests with verbose output
+./venv/bin/pytest -v
+
+# Run tests and show print statements
+./venv/bin/pytest -s
 ```
 
 ### Key Implementation Notes
