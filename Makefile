@@ -15,6 +15,11 @@ lint: lint-yaml lint-actions ## Run all linters
 .PHONY: lint-yaml
 lint-yaml: venv ## Lint YAML files
 	@echo "Linting YAML files..."
+	@echo "Fixing trailing spaces and EOF newlines..."
+	@for file in .github/workflows/*.yml; do \
+		sed -i 's/[[:space:]]*$$//' "$$file"; \
+		sed -i -e '$$a\' "$$file"; \
+	done
 	./venv/bin/yamllint .github/workflows/*.yml
 	@echo "YAML linting completed successfully!"
 	
