@@ -18,7 +18,7 @@ jobs:
     # CHANGE THIS: set your repo name here
     # this is used to prevent the workflow from running on other repos/forks
     if: github.repository == 'thenets/repo-automations'
-    
+
     steps:
       - name: Protect triage label on issue
         if: github.event_name == 'issues' && github.event.action == 'unlabeled' && github.event.label.name == 'triage'
@@ -32,13 +32,13 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: context.issue.number
               });
-              
+
               // Check if any release or backport labels exist
-              const hasReleaseLabel = labels.some(label => 
+              const hasReleaseLabel = labels.some(label =>
                 label.name.startsWith('release '));
-              const hasBackportLabel = labels.some(label => 
+              const hasBackportLabel = labels.some(label =>
                 label.name.startsWith('backport '));
-              
+
               // If no release or backport labels, re-add triage label
               if (!hasReleaseLabel && !hasBackportLabel) {
                 await github.rest.issues.addLabels({
@@ -47,10 +47,10 @@ jobs:
                   issue_number: context.issue.number,
                   labels: ['triage']
                 });
-                console.log('Re-added triage label to issue #' + 
+                console.log('Re-added triage label to issue #' +
                   context.issue.number + ' (no release/backport labels found)');
               } else {
-                console.log('Triage label removal allowed for issue #' + 
+                console.log('Triage label removal allowed for issue #' +
                   context.issue.number + ' (release/backport labels present)');
               }
             } catch (error) {
@@ -69,13 +69,13 @@ jobs:
                 repo: context.repo.repo,
                 issue_number: context.issue.number
               });
-              
+
               // Check if any release or backport labels exist
-              const hasReleaseLabel = labels.some(label => 
+              const hasReleaseLabel = labels.some(label =>
                 label.name.startsWith('release '));
-              const hasBackportLabel = labels.some(label => 
+              const hasBackportLabel = labels.some(label =>
                 label.name.startsWith('backport '));
-              
+
               // If no release or backport labels, re-add triage label
               if (!hasReleaseLabel && !hasBackportLabel) {
                 await github.rest.issues.addLabels({
@@ -84,10 +84,10 @@ jobs:
                   issue_number: context.issue.number,
                   labels: ['triage']
                 });
-                console.log('Re-added triage label to PR #' + 
+                console.log('Re-added triage label to PR #' +
                   context.issue.number + ' (no release/backport labels found)');
               } else {
-                console.log('Triage label removal allowed for PR #' + 
+                console.log('Triage label removal allowed for PR #' +
                   context.issue.number + ' (release/backport labels present)');
               }
             } catch (error) {

@@ -19,8 +19,8 @@ This repository contains GitHub Actions workflows for automating repository mana
 
 ### Testing Commands
 ```bash
-# Validate syntax
-make lint-actions
+# Validate YAML syntax and formatting (run this before committing workflow changes)
+make lint
 
 # Run specific test class
 ./venv/bin/pytest test/test_triage_auto_add.py::TestStalePRDetector
@@ -88,7 +88,7 @@ permissions:
 4. Update this CLAUDE.md if needed
 
 ### Modifying Existing Workflows
-1. Always test YAML syntax before committing
+1. Always run `make lint` to validate YAML syntax and formatting before committing
 2. Consider backward compatibility
 3. Update documentation if behavior changes
 

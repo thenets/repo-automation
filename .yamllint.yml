@@ -1,0 +1,18 @@
+---
+extends: default
+
+rules:
+  # Disable line length checking for GitHub Actions workflows
+  line-length: disable
+  
+  # Keep other important rules enabled
+  trailing-spaces: enable
+  new-line-at-end-of-file: enable
+  empty-lines:
+    max-start: 0
+    max-end: 1
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
