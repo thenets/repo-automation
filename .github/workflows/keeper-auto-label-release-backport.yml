@@ -31,7 +31,6 @@ jobs:
             // Get accepted values from environment variables
             const acceptedReleases = JSON.parse(process.env.ACCEPTED_RELEASES);
             const acceptedBackports = JSON.parse(process.env.ACCEPTED_BACKPORTS);
-            
             console.log(`Accepted releases: ${acceptedReleases.join(', ')}`);
             console.log(`Accepted backports: ${acceptedBackports.join(', ')}`);
 
@@ -74,7 +73,6 @@ jobs:
 
               if (releaseMatch) {
                 const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim();
-                
                 if (releaseValue === '') {
                   // Empty value - skip gracefully
                   console.log('Empty release value found, skipping');
@@ -96,7 +94,6 @@ jobs:
 
               if (backportMatch) {
                 const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim();
-                
                 if (backportValue === '') {
                   // Empty value - skip gracefully
                   console.log('Empty backport value found, skipping');

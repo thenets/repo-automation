@@ -33,7 +33,12 @@ make lint
 
 # Run tests and show print statements
 ./venv/bin/pytest -s
+
+# If I pass a test name only to be executed, use the `-k` pytest arg to auto select this test
 ```
+
+### Pre-Commit Guidelines
+- Always run `make lint format" before commiting git changes
 
 ### Key Implementation Notes
 
