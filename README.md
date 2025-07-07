@@ -2,10 +2,23 @@
 
 This repository contains GitHub Actions workflows to automate common development tasks for team projects.
 
+## Table of Contents
+
+- [Features](#features)
+  - [1. Keeper: auto-add triage label](#1-keeper-auto-add-triage-label) ✅ **Implemented**
+  - [2. Keeper: triage label protection](#2-triage-label-protection) ✅ **Implemented**
+- [Workflow Structure](#workflow-structure)
+- [Implementation Plan](#implementation-plan)
+- [Prerequisites](#prerequisites)
+- [Usage](#usage)
+- [Testing](#testing)
+
 ## Features
 
-### 1. Auto-Add Triage Label
+### 1. Keeper: auto-add triage label
 Automatically adds a "triage" label to new issues and pull requests when they are created.
+
+**File**: `.github/workflows/keeper-auto-add-triage-label.yml`
 
 **Trigger**: `issues.opened`, `pull_request.opened`
 
@@ -14,8 +27,10 @@ Automatically adds a "triage" label to new issues and pull requests when they ar
 - Adds "triage" label to newly created pull requests
 - Only adds if the label doesn't already exist
 
-### 2. Triage Label Protection
+### 2. Keeper: triage label protection
 Prevents removal of the "triage" label unless specific conditions are met.
+
+**File**: `.github/workflows/keeper-triage-label-protection.yml`
 
 **Trigger**: `issues.labeled`, `issues.unlabeled`, `pull_request.labeled`, `pull_request.unlabeled`
 
@@ -30,8 +45,8 @@ Prevents removal of the "triage" label unless specific conditions are met.
 
 ```
 .github/workflows/
-├── triage-auto-add.yml      # Auto-adds triage label to new issues/PRs
-└── triage-protection.yml    # Protects triage label from removal
+├── keeper-auto-add-triage-label.yml     # Auto-adds triage label to new issues/PRs
+└── keeper-triage-label-protection.yml   # Protects triage label from removal
 ```
 
 ## Implementation Plan

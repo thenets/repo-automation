@@ -237,6 +237,46 @@ class GitHubTestManager:
             return True
         except subprocess.CalledProcessError:
             return False
+    
+    def add_labels_to_pr(self, repo_path: Path, pr_number: str, labels: List[str]) -> bool:
+        """Add labels to a PR."""
+        try:
+            cmd = ["gh", "pr", "edit", pr_number, "--add-label"]
+            cmd.extend(labels)
+            subprocess.run(cmd, cwd=repo_path, check=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    
+    def add_labels_to_issue(self, repo_path: Path, issue_number: str, labels: List[str]) -> bool:
+        """Add labels to an issue."""
+        try:
+            cmd = ["gh", "issue", "edit", issue_number, "--add-label"]
+            cmd.extend(labels)
+            subprocess.run(cmd, cwd=repo_path, check=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    
+    def remove_labels_from_pr(self, repo_path: Path, pr_number: str, labels: List[str]) -> bool:
+        """Remove labels from a PR."""
+        try:
+            cmd = ["gh", "pr", "edit", pr_number, "--remove-label"]
+            cmd.extend(labels)
+            subprocess.run(cmd, cwd=repo_path, check=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+    
+    def remove_labels_from_issue(self, repo_path: Path, issue_number: str, labels: List[str]) -> bool:
+        """Remove labels from an issue."""
+        try:
+            cmd = ["gh", "issue", "edit", issue_number, "--remove-label"]
+            cmd.extend(labels)
+            subprocess.run(cmd, cwd=repo_path, check=True)
+            return True
+        except subprocess.CalledProcessError:
+            return False
 
 
 class GitHubFixtures:
@@ -272,6 +312,21 @@ class GitHubFixtures:
             "triage", 
             "FFFF00", 
             "Needs triage"
+        )
+        
+        # Create release and backport labels for testing
+        github_manager_class.create_label(
+            repo_path, 
+            "release 1.0", 
+            "00FF00", 
+            "Release 1.0"
+        )
+        
+        github_manager_class.create_label(
+            repo_path, 
+            "backport main", 
+            "0000FF", 
+            "Backport to main"
         )
         
         yield repo_path
@@ -338,7 +393,7 @@ class TestBasicFunctionality(GitHubFixtures):
 class TestTriageAutoAdd(GitHubFixtures):
     """Integration test cases for the triage auto-add workflow."""
     
-    def test_pr_gets_triage_label(self, test_repo, integration_manager):
+    def test_pr_triage_label_auto_add(self, test_repo, integration_manager):
         """Test that a new PR automatically gets the triage label.
         
         Steps:
@@ -390,29 +445,221 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
     
-    # def test_issue_gets_triage_label(self, test_repo, integration_manager):
-    #     """Test that a new issue automatically gets the triage label."""
-    #     repo_path = test_repo
+    def test_pr_triage_label_protection_without_release_labels(self, test_repo, integration_manager):
+        """Test that triage label is re-added when removed without release/backport labels.
         
-    #     # Create a new issue
-    #     issue_number = integration_manager.create_issue(
-    #         repo_path,
-    #         "Test issue for triage automation",
-    #         "This issue tests the automatic triage label addition."
-    #     )
+        Steps:
+        1. Create a new branch and PR
+        2. Wait for triage label to be added
+        3. Remove triage label
+        4. Wait for triage label to be re-added by protection workflow
+        5. Verify triage label is present
+        6. Cleanup PR
+        """
+        repo_path = test_repo
         
-    #     # Poll until triage label is added (check every 5 seconds, timeout after 120 seconds)
-    #     label_added = integration_manager.poll_until_condition(
-    #         lambda: integration_manager.issue_has_label(repo_path, issue_number, "triage"),
-    #         timeout=120,
-    #         poll_interval=5
-    #     )
+        # Create a new branch
+        branch_name = f"test-protection-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
         
-    #     assert label_added, f"Triage label was not added to issue #{issue_number} within the timeout period"
+        # Modify TESTING.md
+        testing_file = repo_path / "TESTING.md"
+        current_content = testing_file.read_text()
+        new_content = current_content + f"\n\n## Test Protection {int(time.time())}\n\nThis tests triage label protection.\n"
+        testing_file.write_text(new_content)
         
-    #     # Verify the label is indeed present
-    #     labels = integration_manager.get_issue_labels(repo_path, issue_number)
-    #     assert "triage" in labels, f"Expected 'triage' label on issue #{issue_number}, but got: {labels}"
+        # Commit and push changes
+        integration_manager.git_commit_and_push(repo_path, "Test triage label protection", ["TESTING.md"])
+        integration_manager.push_branch(repo_path, branch_name)
         
-    #     # Cleanup issue
-    #     integration_manager.close_issue(repo_path, issue_number)
+        # Create PR
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR for triage label protection",
+            "This PR tests triage label protection without release/backport labels.",
+            branch_name
+        )
+        
+        # Wait for triage label to be added
+        label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5
+        )
+        
+        assert label_added, f"Triage label was not added to PR #{pr_number}"
+        
+        # Remove triage label
+        integration_manager.remove_labels_from_pr(repo_path, pr_number, ["triage"])
+        
+        # Wait a moment for the removal to process
+        time.sleep(2)
+        
+        # Wait for triage label to be re-added by protection workflow
+        label_re_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5
+        )
+        
+        assert label_re_added, f"Triage label was not re-added to PR #{pr_number} by protection workflow"
+        
+        # Verify the label is indeed present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        assert "triage" in labels, f"Expected 'triage' label on PR #{pr_number}, but got: {labels}"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+    
+    def test_pr_triage_label_protection_with_release_label(self, test_repo, integration_manager):
+        """Test that triage label removal is allowed when release label is present.
+        
+        Steps:
+        1. Create a new branch and PR
+        2. Wait for triage label to be added
+        3. Add release label
+        4. Remove triage label
+        5. Wait and verify triage label is NOT re-added
+        6. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Create a new branch
+        branch_name = f"test-release-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Modify TESTING.md
+        testing_file = repo_path / "TESTING.md"
+        current_content = testing_file.read_text()
+        new_content = current_content + f"\n\n## Test Release {int(time.time())}\n\nThis tests triage label protection with release label.\n"
+        testing_file.write_text(new_content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(repo_path, "Test triage label protection with release label", ["TESTING.md"])
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR for triage label protection with release label",
+            "This PR tests triage label protection with release label present.",
+            branch_name
+        )
+        
+        # Wait for triage label to be added
+        label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5
+        )
+        
+        assert label_added, f"Triage label was not added to PR #{pr_number}"
+        
+        # Add release label
+        integration_manager.add_labels_to_pr(repo_path, pr_number, ["release 1.0"])
+        
+        # Wait a moment for the addition to process
+        time.sleep(2)
+        
+        # Remove triage label
+        integration_manager.remove_labels_from_pr(repo_path, pr_number, ["triage"])
+        
+        # Wait and verify triage label is NOT re-added (wait longer to be sure)
+        time.sleep(30)
+        
+        # Verify triage label is still not present
+        has_triage = integration_manager.pr_has_label(repo_path, pr_number, "triage")
+        assert not has_triage, f"Triage label should not be re-added to PR #{pr_number} when release label is present"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+    
+    def test_pr_triage_label_protection_with_backport_label(self, test_repo, integration_manager):
+        """Test that triage label removal is allowed when backport label is present.
+        
+        Steps:
+        1. Create a new branch and PR
+        2. Wait for triage label to be added
+        3. Add backport label
+        4. Remove triage label
+        5. Wait and verify triage label is NOT re-added
+        6. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Create a new branch
+        branch_name = f"test-backport-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Modify TESTING.md
+        testing_file = repo_path / "TESTING.md"
+        current_content = testing_file.read_text()
+        new_content = current_content + f"\n\n## Test Backport {int(time.time())}\n\nThis tests triage label protection with backport label.\n"
+        testing_file.write_text(new_content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(repo_path, "Test triage label protection with backport label", ["TESTING.md"])
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR for triage label protection with backport label",
+            "This PR tests triage label protection with backport label present.",
+            branch_name
+        )
+        
+        # Wait for triage label to be added
+        label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5
+        )
+        
+        assert label_added, f"Triage label was not added to PR #{pr_number}"
+        
+        # Add backport label
+        integration_manager.add_labels_to_pr(repo_path, pr_number, ["backport main"])
+        
+        # Wait a moment for the addition to process
+        time.sleep(2)
+        
+        # Remove triage label
+        integration_manager.remove_labels_from_pr(repo_path, pr_number, ["triage"])
+        
+        # Wait and verify triage label is NOT re-added (wait longer to be sure)
+        time.sleep(30)
+        
+        # Verify triage label is still not present
+        has_triage = integration_manager.pr_has_label(repo_path, pr_number, "triage")
+        assert not has_triage, f"Triage label should not be re-added to PR #{pr_number} when backport label is present"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+    
+    def test_issue_triage_label_auto_add(self, test_repo, integration_manager):
+        """Test that a new issue automatically gets the triage label."""
+        repo_path = test_repo
+        
+        # Create a new issue
+        issue_number = integration_manager.create_issue(
+            repo_path,
+            "Test issue for triage automation",
+            "This issue tests the automatic triage label addition."
+        )
+        
+        # Poll until triage label is added (check every 5 seconds, timeout after 120 seconds)
+        label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.issue_has_label(repo_path, issue_number, "triage"),
+            timeout=120,
+            poll_interval=5
+        )
+        
+        assert label_added, f"Triage label was not added to issue #{issue_number} within the timeout period"
+        
+        # Verify the label is indeed present
+        labels = integration_manager.get_issue_labels(repo_path, issue_number)
+        assert "triage" in labels, f"Expected 'triage' label on issue #{issue_number}, but got: {labels}"
+        
+        # Cleanup issue
+        integration_manager.close_issue(repo_path, issue_number)

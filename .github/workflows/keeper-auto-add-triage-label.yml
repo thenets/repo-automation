@@ -14,6 +14,9 @@ permissions:
 jobs:
   add-triage-label:
     runs-on: ubuntu-latest
+
+    # CHANGE THIS: set your repo name here
+    # this is used to prevent the workflow from running on other repos/forks
     if: github.repository == 'thenets/repo-automations'
 
     steps:
