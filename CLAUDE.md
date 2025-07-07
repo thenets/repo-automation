@@ -18,11 +18,8 @@ This repository contains GitHub Actions workflows for automating repository mana
 
 ### Testing Commands
 ```bash
-# Validate YAML syntax
-yamllint .github/workflows/*.yml
-
-# Test workflow syntax (if available)
-actionlint .github/workflows/*.yml
+# Validate syntax
+make lint
 ```
 
 ### Key Implementation Notes
