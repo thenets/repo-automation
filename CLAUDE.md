@@ -106,3 +106,7 @@ permissions:
 3. **Permissions**: Verify Actions have appropriate permissions
 4. **Branch Protection**: Consider if workflows need to run on protected branches
 5. **Repository Restriction**: Update `if: github.repository == 'your-org/your-repo'` in all workflows
+
+## Documentation Guidelines
+
+- New feature plans must be documented into the README.md

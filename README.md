@@ -8,6 +8,7 @@ This repository contains GitHub Actions workflows to automate common development
   - [1. Keeper: auto-add triage label](#1-keeper-auto-add-triage-label) ✅ **Implemented**
   - [2. Keeper: triage label protection](#2-triage-label-protection) ✅ **Implemented**
   - [3. Keeper: stale PR detector](#3-keeper-stale-pr-detector) ✅ **Implemented**
+  - [4. Keeper: auto-label release and backport](#4-keeper-auto-label-release-and-backport) ✅ **Implemented**
 - [Workflow Structure](#workflow-structure)
 - [Implementation Plan](#implementation-plan)
 - [Prerequisites](#prerequisites)
@@ -18,9 +19,10 @@ This repository contains GitHub Actions workflows to automate common development
 
 ```
 .github/workflows/
-├── keeper-auto-add-triage-label.yml     # Auto-adds triage label to new issues/PRs
-├── keeper-triage-label-protection.yml   # Protects triage label from removal
-└── keeper-stale-pr-detector.yml         # Marks inactive PRs as stale
+├── keeper-auto-add-triage-label.yml       # Auto-adds triage label to new issues/PRs
+├── keeper-triage-label-protection.yml     # Protects triage label from removal
+├── keeper-stale-pr-detector.yml           # Marks inactive PRs as stale
+└── keeper-auto-label-release-backport.yml # Auto-labels PRs based on YAML frontmatter
 ```
 
 ## How to use them
@@ -99,6 +101,50 @@ flowchart LR
     C -->|No| E[Skip PR]
     D --> F[✅ Complete]
     E --> F
+```
+
+### 4. Keeper: auto-label release and backport
+Automatically adds release and backport labels to pull requests based on YAML code blocks in the PR description.
+
+**File**: `.github/workflows/keeper-auto-label-release-backport.yml`
+
+**Trigger**: `pull_request.opened`, `pull_request.synchronize`
+
+**Behavior**:
+- Scans the PR description for YAML code blocks
+- Parses `release` and `backport` values from YAML
+- Adds corresponding labels (e.g., `release 1.5`, `backport 1.4`)
+- Ignores comments after `#` in YAML values
+- Only processes the first YAML block found with valid content
+
+**Supported YAML format**:
+
+Include a YAML code block in your PR description:
+```yaml
+release: 1.5    # Creates "release 1.5" label
+backport: 1.4   # Creates "backport 1.4" label  
+```
+
+**Example PR description**:
+```
+This PR adds new feature X.
+
+```yaml
+release: 1.5
+backport: 1.4
+```
+
+The changes are backward compatible.
+```
+
+```mermaid
+flowchart LR
+    A[PR Created/Updated] --> B[Scan Changed Files]
+    B --> C{YAML Found?}
+    C -->|Yes| D[Parse release/backport]
+    C -->|No| E[✅ Skip]
+    D --> F[Add Labels]
+    F --> G[✅ Complete]
 ```
 
 ## Implementation Plan

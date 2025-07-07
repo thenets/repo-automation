@@ -1,0 +1,386 @@
+"""
+Test suite for the release and backport auto-labeler GitHub Actions workflow.
+
+This test validates that the workflow automatically adds release and backport labels
+to PRs based on YAML code blocks in the PR description.
+"""
+
+import json
+import os
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import pytest
+from .test_triage_auto_add import GitHubTestManager, GitHubFixtures
+
+
+@pytest.mark.integration
+class TestReleaseBackportLabeler(GitHubFixtures):
+    """Integration test cases for the release and backport auto-labeler workflow."""
+
+    def test_yaml_code_block_labeling(self, test_repo, integration_manager):
+        """Test that PR with YAML code block in description gets appropriate labels.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with YAML code block in description
+        5. Wait for labels to be added
+        6. Verify correct labels are present
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Ensure required labels exist
+        integration_manager.create_label(repo_path, "release 1.5", "00FF00", "Release 1.5")
+        integration_manager.create_label(repo_path, "backport 1.4", "0000FF", "Backport to 1.4")
+        
+        # Create a new branch
+        branch_name = f"test-yaml-code-block-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Create a simple file change
+        test_file = repo_path / "test_change.md"
+        content = """# Test File
+
+This file contains a simple change for testing PR labeling.
+"""
+        test_file.write_text(content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file for PR labeling", ["test_change.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR with YAML code block in description
+        pr_body = """This PR tests automatic labeling based on YAML code blocks in the PR description.
+
+```yaml
+release: 1.5
+backport: 1.4
+```
+
+The changes are backward compatible."""
+        
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR with YAML code block",
+            pr_body,
+            branch_name,
+        )
+        
+        # Wait for labels to be added
+        release_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "release 1.5"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        backport_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "backport 1.4"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        assert release_label_added, f"Release label was not added to PR #{pr_number}"
+        assert backport_label_added, f"Backport label was not added to PR #{pr_number}"
+        
+        # Verify the labels are indeed present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        assert "release 1.5" in labels, f"Expected 'release 1.5' label on PR #{pr_number}, but got: {labels}"
+        assert "backport 1.4" in labels, f"Expected 'backport 1.4' label on PR #{pr_number}, but got: {labels}"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_yaml_with_devel_release_labeling(self, test_repo, integration_manager):
+        """Test that PR with YAML code block using 'devel' release gets appropriate labels.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with YAML code block in description (using 'devel' release)
+        5. Wait for labels to be added
+        6. Verify correct labels are present
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Ensure required labels exist
+        integration_manager.create_label(repo_path, "release devel", "FF0000", "Release devel")
+        integration_manager.create_label(repo_path, "backport 1.5", "00FFFF", "Backport to 1.5")
+        
+        # Create a new branch
+        branch_name = f"test-yaml-devel-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Create a simple file change
+        test_file = repo_path / "test_devel.md"
+        content = """# Test File for Devel Release
+
+This file contains changes for development release.
+"""
+        test_file.write_text(content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file for devel release", ["test_devel.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR with YAML code block in description
+        pr_body = """This PR tests automatic labeling for development releases.
+
+```yaml
+release: devel
+backport: 1.5
+```
+
+These changes are for the development branch."""
+        
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR with devel release YAML",
+            pr_body,
+            branch_name,
+        )
+        
+        # Wait for labels to be added
+        release_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "release devel"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        backport_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "backport 1.5"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        assert release_label_added, f"Release label was not added to PR #{pr_number}"
+        assert backport_label_added, f"Backport label was not added to PR #{pr_number}"
+        
+        # Verify the labels are indeed present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        assert "release devel" in labels, f"Expected 'release devel' label on PR #{pr_number}, but got: {labels}"
+        assert "backport 1.5" in labels, f"Expected 'backport 1.5' label on PR #{pr_number}, but got: {labels}"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_release_only_labeling(self, test_repo, integration_manager):
+        """Test that PR with only release info gets only release label.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with YAML code block containing only release info
+        5. Wait for release label to be added
+        6. Verify only release label is present (no backport)
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Ensure required label exists
+        integration_manager.create_label(repo_path, "release 1.4", "FFFF00", "Release 1.4")
+        
+        # Create a new branch
+        branch_name = f"test-release-only-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Create a simple file change
+        test_file = repo_path / "test_release_only.md"
+        content = """# Test File - Release Only
+
+This file contains changes for release only.
+"""
+        test_file.write_text(content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file with release info only", ["test_release_only.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR with YAML code block containing only release info
+        pr_body = """This PR tests automatic labeling with only release information.
+
+```yaml
+release: 1.4
+```
+
+No backport is needed for this change."""
+        
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR with release only",
+            pr_body,
+            branch_name,
+        )
+        
+        # Wait for release label to be added
+        release_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "release 1.4"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        assert release_label_added, f"Release label was not added to PR #{pr_number}"
+        
+        # Verify the labels
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        assert "release 1.4" in labels, f"Expected 'release 1.4' label on PR #{pr_number}, but got: {labels}"
+        
+        # Verify no backport labels are present
+        backport_labels = [label for label in labels if label.startswith("backport")]
+        assert len(backport_labels) == 0, f"No backport labels should be present, but found: {backport_labels}"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_no_yaml_no_labeling(self, test_repo, integration_manager):
+        """Test that PR without YAML code block doesn't get release/backport labels.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR without YAML code block in description
+        5. Wait for triage label (should still be added)
+        6. Verify no release/backport labels are present
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Create a new branch
+        branch_name = f"test-no-yaml-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Create a simple file change
+        test_file = repo_path / "test_no_yaml.md"
+        content = """# Test File - No YAML
+
+This file contains a simple change without any YAML configuration.
+"""
+        test_file.write_text(content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file without YAML", ["test_no_yaml.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR without YAML code block in description
+        pr_body = """This PR tests that PRs without YAML code blocks don't get release/backport labels.
+
+The changes are simple and don't require any specific labeling."""
+        
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR without YAML",
+            pr_body,
+            branch_name,
+        )
+        
+        # Wait for triage label to be added (from the existing triage workflow)
+        triage_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
+        
+        # Wait a bit more to ensure release/backport workflow has time to run
+        time.sleep(30)
+        
+        # Verify no release/backport labels are present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        release_labels = [label for label in labels if label.startswith("release")]
+        backport_labels = [label for label in labels if label.startswith("backport")]
+        
+        assert len(release_labels) == 0, f"No release labels should be present, but found: {release_labels}"
+        assert len(backport_labels) == 0, f"No backport labels should be present, but found: {backport_labels}"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_invalid_yaml_no_labeling(self, test_repo, integration_manager):
+        """Test that PR with invalid YAML code block doesn't get labels.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with malformed YAML code block in description
+        5. Wait for triage label (should still be added)
+        6. Verify no release/backport labels are present
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Create a new branch
+        branch_name = f"test-invalid-yaml-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Create a simple file change
+        test_file = repo_path / "test_invalid_yaml.md"
+        content = """# Test File - Invalid YAML
+
+This file contains changes to test invalid YAML handling.
+"""
+        test_file.write_text(content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file with invalid YAML", ["test_invalid_yaml.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR with malformed YAML code block in description
+        pr_body = """This PR tests that malformed YAML code blocks don't get release/backport labels.
+
+```yaml
+release: 
+backport
+```
+
+The YAML above is malformed and should be ignored."""
+        
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR with invalid YAML",
+            pr_body,
+            branch_name,
+        )
+        
+        # Wait for triage label to be added (from the existing triage workflow)
+        triage_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
+        
+        # Wait a bit more to ensure release/backport workflow has time to run
+        time.sleep(30)
+        
+        # Verify no release/backport labels are present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        release_labels = [label for label in labels if label.startswith("release")]
+        backport_labels = [label for label in labels if label.startswith("backport")]
+        
+        assert len(release_labels) == 0, f"No release labels should be present, but found: {release_labels}"
+        assert len(backport_labels) == 0, f"No backport labels should be present, but found: {backport_labels}"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)

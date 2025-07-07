@@ -1,5 +1,5 @@
 ---
-name: "Keeper: auto-label release and backport from YAML frontmatter"
+name: "Keeper: auto-label release and backport from PR description"
 
 'on':
   pull_request:
@@ -17,124 +17,52 @@ jobs:
     if: github.repository == 'thenets/repo-automations'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Parse YAML frontmatter and add labels
+      - name: Parse YAML from PR description and add labels
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            const path = require('path');
+            console.log(`Processing PR #${context.issue.number}`);
 
-            // Get list of changed files in the PR
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-
-            console.log(`Found ${files.length} changed files in PR #${context.issue.number}`);
+            // Get PR description
+            const prBody = context.payload.pull_request.body || '';
+            console.log(`PR description:\n${prBody}`);
 
             let yamlFound = false;
             let releaseLabel = null;
             let backportLabel = null;
 
-            // Check each changed file for YAML frontmatter
-            for (const file of files) {
-              if (file.status === 'added' || file.status === 'modified') {
-                try {
-                  const response = await github.rest.repos.getContent({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    path: file.filename,
-                    ref: context.payload.pull_request.head.sha
-                  });
+            // Look for YAML code blocks in the PR description
+            const yamlBlockRegex = /```yaml\s*\n([\s\S]*?)\n\s*```/g;
+            let match;
 
-                  const content = Buffer.from(response.data.content, 'base64').toString('utf8');
-                  const lines = content.split('\n');
+            while ((match = yamlBlockRegex.exec(prBody)) !== null) {
+              const yamlContent = match[1];
+              console.log(`Found YAML block:\n${yamlContent}`);
 
-                  // Check for YAML frontmatter at the beginning of the file
-                  if (lines.length > 0 && lines[0].trim() === '---') {
-                    console.log(`Found YAML frontmatter in ${file.filename}`);
+              // Parse release and backport values
+              const releaseMatch = yamlContent.match(/^release:\s*(.+)$/m);
+              const backportMatch = yamlContent.match(/^backport:\s*(.+)$/m);
 
-                    // Find the end of YAML frontmatter
-                    let yamlEndIndex = -1;
-                    for (let i = 1; i < lines.length; i++) {
-                      if (lines[i].trim() === '---') {
-                        yamlEndIndex = i;
-                        break;
-                      }
-                    }
-
-                    if (yamlEndIndex > 0) {
-                      // Extract YAML content
-                      const yamlContent = lines.slice(1, yamlEndIndex).join('\n');
-                      console.log(`YAML frontmatter found:\n${yamlContent}`);
-
-                      // Parse release and backport values
-                      const releaseMatch = yamlContent.match(/^release:\s*(.+)$/m);
-                      const backportMatch = yamlContent.match(/^backport:\s*(.+)$/m);
-
-                      if (releaseMatch) {
-                        const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim();
-                        releaseLabel = `release ${releaseValue}`;
-                        console.log(`Found release: ${releaseValue}`);
-                        yamlFound = true;
-                      }
-
-                      if (backportMatch) {
-                        const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim();
-                        backportLabel = `backport ${backportValue}`;
-                        console.log(`Found backport: ${backportValue}`);
-                        yamlFound = true;
-                      }
-
-                      // Stop after finding the first file with YAML frontmatter
-                      if (yamlFound) break;
-                    }
-                  }
-
-                  // Also check for YAML blocks inside HTML comments (at the top of the file)
-                  if (!yamlFound && lines.length > 0) {
-                    const topContent = lines.slice(0, 20).join('\n'); // Check first 20 lines
-
-                    // Look for HTML comment with YAML block
-                    const commentMatch = topContent.match(/<!--\s*\n?\s*```yaml\s*\n([\s\S]*?)\n\s*```\s*\n?\s*-->/);
-                    if (commentMatch) {
-                      const yamlContent = commentMatch[1];
-                      console.log(`YAML block in HTML comment found in ${file.filename}:\n${yamlContent}`);
-
-                      // Parse release and backport values
-                      const releaseMatch = yamlContent.match(/^release:\s*(.+)$/m);
-                      const backportMatch = yamlContent.match(/^backport:\s*(.+)$/m);
-
-                      if (releaseMatch) {
-                        const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim();
-                        releaseLabel = `release ${releaseValue}`;
-                        console.log(`Found release: ${releaseValue}`);
-                        yamlFound = true;
-                      }
-
-                      if (backportMatch) {
-                        const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim();
-                        backportLabel = `backport ${backportValue}`;
-                        console.log(`Found backport: ${backportValue}`);
-                        yamlFound = true;
-                      }
-
-                      // Stop after finding the first file with YAML block
-                      if (yamlFound) break;
-                    }
-                  }
-                } catch (error) {
-                  console.log(`Could not read file ${file.filename}: ${error.message}`);
-                }
+              if (releaseMatch) {
+                const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim();
+                releaseLabel = `release ${releaseValue}`;
+                console.log(`Found release: ${releaseValue}`);
+                yamlFound = true;
               }
+
+              if (backportMatch) {
+                const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim();
+                backportLabel = `backport ${backportValue}`;
+                console.log(`Found backport: ${backportValue}`);
+                yamlFound = true;
+              }
+
+              // Stop after finding the first YAML block with valid content
+              if (yamlFound) break;
             }
 
             if (!yamlFound) {
-              console.log('No YAML frontmatter or YAML blocks found in any changed files');
+              console.log('No YAML code blocks found in PR description');
               return;
             }
 
