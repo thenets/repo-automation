@@ -42,6 +42,14 @@ Automatically adds a "triage" label to new issues and pull requests when they ar
 - Adds "triage" label to newly created pull requests
 - Only adds if the label doesn't already exist
 
+```mermaid
+flowchart LR
+    A[New Issue/PR Created] --> B[Add 'triage' Label]
+    B --> C[✅ Complete]
+```
+
+
+
 ### 2. Keeper: triage label protection
 Prevents removal of the "triage" label unless specific conditions are met.
 
@@ -55,6 +63,14 @@ Prevents removal of the "triage" label unless specific conditions are met.
   - Labels starting with "release " (e.g., "release 1.0", "release v2.3")
   - Labels starting with "backport " (e.g., "backport 1.0", "backport main")
 - If neither condition is met, automatically re-adds the "triage" label
+
+```mermaid
+flowchart LR
+    A[Triage Label Removed] --> B{Has release/backport label?}
+    B -->|Yes| C[✅ Allow Removal]
+    B -->|No| D[Re-add Triage Label]
+    D --> E[✅ Complete]
+```
 
 ### 3. Keeper: stale PR detector
 Automatically marks pull requests as stale when they have no activity for more than 1 day.
@@ -74,6 +90,16 @@ Automatically marks pull requests as stale when they have no activity for more t
   - Labels added or removed
   - PR reviews submitted
   - PR status changes (ready for review, draft, etc.)
+
+```mermaid
+flowchart LR
+    A[Daily Cron Job] --> B[Check Open PRs]
+    B --> C{PR inactive >1 day?}
+    C -->|Yes| D[Add 'stale' Label]
+    C -->|No| E[Skip PR]
+    D --> F[✅ Complete]
+    E --> F
+```
 
 ## Implementation Plan
 
