@@ -39,50 +39,28 @@ class GitHubTestManager:
         
         return clone_path
     
-    def create_test_repo(self, repo_name: str, private: bool = True) -> Path:
-        """Create a new GitHub repository for testing."""
+    def create_temp_repo(self, repo_name: str) -> Path:
+        """Create a temporary local repository that uses the existing repo-automations as remote."""
         repo_path = self.cache_dir / repo_name
         
         # Clean up if exists
         if repo_path.exists():
             subprocess.run(["rm", "-rf", str(repo_path)], check=True)
         
-        # Try to delete existing remote repository first
-        try:
-            subprocess.run([
-                "gh", "repo", "delete", repo_name, "--yes"
-            ], cwd=self.cache_dir, check=False, capture_output=True)
-        except:
-            pass  # Repository may not exist
+        # Clone the existing repo-automations repository
+        subprocess.run([
+            "git", "clone", "https://github.com/thenets/repo-automations.git", str(repo_path)
+        ], check=True)
         
-        # Create new repository
-        cmd = ["gh", "repo", "create", repo_name, "--clone"]
-        if private:
-            cmd.append("--private")
+        # Ensure we're on main branch
+        subprocess.run(["git", "checkout", "main"], cwd=repo_path, check=True)
         
-        subprocess.run(cmd, cwd=self.cache_dir, check=True)
+        # Pull latest changes
+        subprocess.run(["git", "pull", "origin", "main"], cwd=repo_path, check=True)
         
         return repo_path
     
-    def delete_test_repo(self, repo_name: str) -> bool:
-        """Delete a GitHub repository."""
-        try:
-            subprocess.run([
-                "gh", "repo", "delete", repo_name, "--yes"
-            ], cwd=self.cache_dir, check=True)
-            return True
-        except subprocess.CalledProcessError:
-            return False
-    
-    def copy_workflow_files(self, source_repo: Path, target_repo: Path) -> None:
-        """Copy workflow files from source to target repository."""
-        workflow_src = source_repo / ".github/workflows/triage-auto-add.yml"
-        workflow_dst = target_repo / ".github/workflows/triage-auto-add.yml"
-        workflow_dst.parent.mkdir(parents=True, exist_ok=True)
-        
-        subprocess.run([
-            "cp", str(workflow_src), str(workflow_dst)
-        ], check=True)
+
     
     def create_label(self, repo_path: Path, name: str, color: str, description: str) -> bool:
         """Create a label in the repository."""
@@ -107,10 +85,29 @@ class GitHubTestManager:
         subprocess.run([
             "git", "commit", "-m", message
         ], cwd=repo_path, check=True)
-        subprocess.run(["git", "push"], cwd=repo_path, check=True)
+        
+        # Get current branch name and push
+        current_branch = subprocess.run(
+            ["git", "branch", "--show-current"], 
+            cwd=repo_path, 
+            capture_output=True, 
+            text=True, 
+            check=True
+        ).stdout.strip()
+        
+        subprocess.run(["git", "push", "origin", current_branch], cwd=repo_path, check=True)
     
     def create_branch(self, repo_path: Path, branch_name: str) -> None:
         """Create and checkout a new branch."""
+        # First ensure we're on main branch
+        subprocess.run(["git", "checkout", "main"], cwd=repo_path, check=True)
+        
+        # Delete local branch if it exists
+        subprocess.run([
+            "git", "branch", "-D", branch_name
+        ], cwd=repo_path, check=False)  # Don't fail if branch doesn't exist
+        
+        # Create new branch
         subprocess.run([
             "git", "checkout", "-b", branch_name
         ], cwd=repo_path, check=True)
@@ -207,36 +204,25 @@ class GitHubFixtures:
     
     @pytest.fixture(scope="class")
     def test_repo(self, github_manager_class):
-        """Create a test repository with the workflow for integration tests."""
+        """Create a temporary repository that uses the existing repo-automations as remote."""
         # Create unique repository name with timestamp
         repo_name = f"test-repo-automations-{int(time.time())}"
         
-        # Create test repository
-        repo_path = github_manager_class.create_test_repo(repo_name, private=True)
+        # Create temporary local repository
+        repo_path = github_manager_class.create_temp_repo(repo_name)
         
-        # Copy workflow files to test repo
-        current_repo = Path.cwd()
-        github_manager_class.copy_workflow_files(current_repo, repo_path)
-        
-        # Create TESTING.md file
-        testing_file = repo_path / "TESTING.md"
-        testing_file.write_text("# Testing\n\nThis is a test file.\n")
-        
-        # Create triage label
+        # Ensure triage label exists (create if it doesn't exist)
         github_manager_class.create_label(
             repo_path, 
             "triage", 
-            "yellow", 
+            "FFFF00", 
             "Needs triage"
         )
         
-        # Commit and push workflow
-        github_manager_class.git_commit_and_push(repo_path, "Add triage auto-add workflow")
-        
         yield repo_path
         
-        # Cleanup
-        github_manager_class.delete_test_repo(repo_name)
+        # Cleanup: remove temporary directory
+        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
     
     @pytest.fixture(scope="class")
     def integration_manager(self, github_manager_class):
@@ -248,11 +234,48 @@ class GitHubFixtures:
 class TestBasicFunctionality(GitHubFixtures):
     """Basic functionality tests that don't require GitHub integration."""
     
-    def test_hello(self, cloned_repo):
-        """Test that the cloned repo path is correct."""
-        expected_path = Path("./cache/test/repo/test-hello-repo")
-        assert cloned_repo == expected_path
-        assert cloned_repo.exists()
+    def test_hello(self, github_manager):
+        """Test basic functionality of the GitHubTestManager class."""
+        # Create a temporary repository using the existing repo-automations as remote
+        repo_name = f"test-hello-{int(time.time())}"
+        repo_path = github_manager.create_temp_repo(repo_name)
+        
+        # Verify the repository was created and exists
+        assert repo_path.exists()
+        assert (repo_path / ".git").exists()
+        
+        # Create a test branch
+        branch_name = f"test-branch-{int(time.time())}"
+        github_manager.create_branch(repo_path, branch_name)
+        
+        # Modify a file (TESTING.md)
+        testing_file = repo_path / "TESTING.md"
+        current_content = testing_file.read_text()
+        new_content = current_content + f"\n\n## Test Basic Functionality {int(time.time())}\n\nThis is a test from test_hello.\n"
+        testing_file.write_text(new_content)
+        
+        # Commit and push the changes
+        github_manager.git_commit_and_push(repo_path, "Test basic functionality from test_hello", ["TESTING.md"])
+        
+        # Create a PR
+        pr_number = github_manager.create_pr(
+            repo_path,
+            "Test PR from test_hello",
+            "This PR tests basic functionality from the test_hello method.",
+            branch_name
+        )
+        
+        print(f"Created PR #{pr_number}")
+        
+        # Verify the PR was created by checking its labels
+        labels = github_manager.get_pr_labels(repo_path, pr_number)
+        print(f"PR #{pr_number} labels: {labels}")
+        
+        # Clean up: close the PR and delete the branch
+        github_manager.close_pr(repo_path, pr_number, delete_branch=True)
+        
+        # Clean up: remove temporary directory
+        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
 
 # Integration tests

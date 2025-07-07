@@ -60,3 +60,12 @@ clean: ## Clean up temporary files
 	rm -rf venv/
 	rm -rf cache/
 	rm -f actionlint
+
+
+# -------------
+# debug
+# -------------
+
+.PHONY: debug-gh-list-pr
+debug-gh-list-pr: ## List all PRs
+	gh pr list --state all --limit 10
