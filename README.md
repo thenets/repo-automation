@@ -116,13 +116,18 @@ Automatically adds release and backport labels to pull requests based on YAML co
 - Validates values against accepted lists (see below)
 - Adds corresponding labels (e.g., `release 1.5`, `backport 1.4`)
 - Ignores comments after `#` in YAML values
-- Only processes the first YAML block found with valid content
+- Only processes the first YAML block found
+
+**Validation Rules**:
+- **Empty values** (e.g., `release:` with no value) → Workflow exits gracefully
+- **Valid values** (from accepted lists) → Labels are added successfully  
+- **Invalid values** (not in accepted lists) → **Workflow fails with error**
 
 **Accepted Values**:
 - **Release tags**: `1.0`, `1.1`, `1.2`, `1.3`, `1.4`, `1.5`, `1.6`, `2.0`, `2.1`, `2.2`, `devel`, `main`
 - **Backport tags**: `1.0`, `1.1`, `1.2`, `1.3`, `1.4`, `1.5`, `1.6`, `2.0`, `2.1`, `2.2`, `main`
 
-*Note: Values not in these lists will be ignored and no labels will be added.*
+*Note: Using values not in these lists will cause the workflow to fail, alerting you to fix the invalid value.*
 
 **Supported YAML format**:
 
@@ -133,16 +138,15 @@ backport: 1.4   # Creates "backport 1.4" label
 ```
 
 **Example PR description**:
-```
-This PR adds new feature X.
 
-```yaml
-release: 1.5
-backport: 1.4
-```
-
-The changes are backward compatible.
-```
+> This PR adds new feature X.
+> 
+> ```yaml
+> release: 1.5
+> backport: 1.4
+> ```
+> 
+> The changes are backward compatible.
 
 ```mermaid
 flowchart LR

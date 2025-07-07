@@ -58,31 +58,43 @@ jobs:
               if (releaseMatch) {
                 const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim();
                 
-                // Validate release value against accepted list
-                if (acceptedReleases.includes(releaseValue)) {
+                if (releaseValue === '') {
+                  // Empty value - skip gracefully
+                  console.log('Empty release value found, skipping');
+                } else if (acceptedReleases.includes(releaseValue)) {
+                  // Valid value - add label
                   releaseLabel = `release ${releaseValue}`;
                   console.log(`Found valid release: ${releaseValue}`);
                   yamlFound = true;
                 } else {
-                  console.log(`Invalid release value: ${releaseValue}. Accepted values: ${acceptedReleases.join(', ')}`);
+                  // Invalid value - fail the workflow
+                  const errorMsg = `❌ Invalid release value: "${releaseValue}". Accepted values: ${acceptedReleases.join(', ')}`;
+                  console.error(errorMsg);
+                  throw new Error(errorMsg);
                 }
               }
 
               if (backportMatch) {
                 const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim();
                 
-                // Validate backport value against accepted list
-                if (acceptedBackports.includes(backportValue)) {
+                if (backportValue === '') {
+                  // Empty value - skip gracefully
+                  console.log('Empty backport value found, skipping');
+                } else if (acceptedBackports.includes(backportValue)) {
+                  // Valid value - add label
                   backportLabel = `backport ${backportValue}`;
                   console.log(`Found valid backport: ${backportValue}`);
                   yamlFound = true;
                 } else {
-                  console.log(`Invalid backport value: ${backportValue}. Accepted values: ${acceptedBackports.join(', ')}`);
+                  // Invalid value - fail the workflow
+                  const errorMsg = `❌ Invalid backport value: "${backportValue}". Accepted values: ${acceptedBackports.join(', ')}`;
+                  console.error(errorMsg);
+                  throw new Error(errorMsg);
                 }
               }
 
-              // Stop after finding the first YAML block with valid content
-              if (yamlFound) break;
+              // Stop after finding the first YAML block with any content (valid or processed)
+              if (releaseMatch || backportMatch) break;
             }
 
             if (!yamlFound) {
