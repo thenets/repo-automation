@@ -162,6 +162,42 @@ class GitHubTestManager:
         data = json.loads(result.stdout)
         return [label["name"] for label in data["labels"]]
     
+    def pr_has_label(self, repo_path: Path, pr_number: str, label_name: str) -> bool:
+        """Check if a PR has a specific label."""
+        try:
+            labels = self.get_pr_labels(repo_path, pr_number)
+            return label_name in labels
+        except subprocess.CalledProcessError:
+            return False
+    
+    def issue_has_label(self, repo_path: Path, issue_number: str, label_name: str) -> bool:
+        """Check if an issue has a specific label."""
+        try:
+            labels = self.get_issue_labels(repo_path, issue_number)
+            return label_name in labels
+        except subprocess.CalledProcessError:
+            return False
+    
+    def poll_until_condition(self, condition_func, timeout: int = 120, poll_interval: int = 5) -> bool:
+        """Poll until a condition is met or timeout is reached.
+        
+        Args:
+            condition_func: A callable that returns True when the condition is met
+            timeout: Maximum time to wait in seconds (default: 120)
+            poll_interval: Time between polls in seconds (default: 5)
+            
+        Returns:
+            True if condition was met, False if timeout was reached
+        """
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            if condition_func():
+                return True
+            time.sleep(poll_interval)
+        
+        return False
+    
     def close_pr(self, repo_path: Path, pr_number: str, delete_branch: bool = True) -> bool:
         """Close a PR and optionally delete the branch."""
         try:
@@ -319,12 +355,17 @@ class TestTriageAutoAdd(GitHubFixtures):
             branch_name
         )
         
-        # Wait for GitHub Actions to process
-        time.sleep(30)
+        # Poll until triage label is added (check every 5 seconds, timeout after 120 seconds)
+        label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5
+        )
         
-        # Check if triage label was added
+        assert label_added, f"Triage label was not added to PR #{pr_number} within the timeout period"
+        
+        # Verify the label is indeed present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        
         assert "triage" in labels, f"Expected 'triage' label on PR #{pr_number}, but got: {labels}"
         
         # Cleanup PR
@@ -341,12 +382,17 @@ class TestTriageAutoAdd(GitHubFixtures):
     #         "This issue tests the automatic triage label addition."
     #     )
         
-    #     # Wait for GitHub Actions to process
-    #     time.sleep(30)
+    #     # Poll until triage label is added (check every 5 seconds, timeout after 120 seconds)
+    #     label_added = integration_manager.poll_until_condition(
+    #         lambda: integration_manager.issue_has_label(repo_path, issue_number, "triage"),
+    #         timeout=120,
+    #         poll_interval=5
+    #     )
         
-    #     # Check if triage label was added
+    #     assert label_added, f"Triage label was not added to issue #{issue_number} within the timeout period"
+        
+    #     # Verify the label is indeed present
     #     labels = integration_manager.get_issue_labels(repo_path, issue_number)
-        
     #     assert "triage" in labels, f"Expected 'triage' label on issue #{issue_number}, but got: {labels}"
         
     #     # Cleanup issue
