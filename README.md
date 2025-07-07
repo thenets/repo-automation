@@ -7,7 +7,7 @@ This repository contains GitHub Actions workflows to automate common development
 - [Features](#features)
   - [1. Keeper: auto-add triage label](#1-keeper-auto-add-triage-label) ✅ **Implemented**
   - [2. Keeper: triage label protection](#2-triage-label-protection) ✅ **Implemented**
-  - [3. Keeper: stale PR detector](#3-keeper-stale-pr-detector) 🔄 **Planned**
+  - [3. Keeper: stale PR detector](#3-keeper-stale-pr-detector) ✅ **Implemented**
 - [Workflow Structure](#workflow-structure)
 - [Implementation Plan](#implementation-plan)
 - [Prerequisites](#prerequisites)
@@ -20,7 +20,7 @@ This repository contains GitHub Actions workflows to automate common development
 .github/workflows/
 ├── keeper-auto-add-triage-label.yml     # Auto-adds triage label to new issues/PRs
 ├── keeper-triage-label-protection.yml   # Protects triage label from removal
-└── keeper-stale-pr-detector.yml         # Marks inactive PRs as stale (planned)
+└── keeper-stale-pr-detector.yml         # Marks inactive PRs as stale
 ```
 
 ## How to use them
@@ -59,7 +59,7 @@ Prevents removal of the "triage" label unless specific conditions are met.
 ### 3. Keeper: stale PR detector
 Automatically marks pull requests as stale when they have no activity for more than 1 day.
 
-**File**: `.github/workflows/keeper-stale-pr-detector.yml` (planned)
+**File**: `.github/workflows/keeper-stale-pr-detector.yml`
 
 **Trigger**: `schedule` (daily cron job)
 
