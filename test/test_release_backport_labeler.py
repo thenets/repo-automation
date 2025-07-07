@@ -384,3 +384,79 @@ The YAML above is malformed and should be ignored."""
         
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_invalid_tag_values_no_labeling(self, test_repo, integration_manager):
+        """Test that PR with invalid release/backport values doesn't get labels.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with YAML code block containing invalid tag values
+        5. Wait for triage label (should still be added)
+        6. Verify no release/backport labels are present
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Create a new branch
+        branch_name = f"test-invalid-tags-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Create a simple file change
+        test_file = repo_path / "test_invalid_tags.md"
+        content = """# Test File - Invalid Tags
+
+This file contains changes to test invalid tag value handling.
+"""
+        test_file.write_text(content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file with invalid tag values", ["test_invalid_tags.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR with YAML code block containing invalid tag values
+        pr_body = """This PR tests that invalid release/backport tag values don't get labels.
+
+```yaml
+release: 99.99  # Invalid release version not in accepted list
+backport: invalid-branch  # Invalid backport target not in accepted list
+```
+
+The tags above are not in the accepted lists and should be ignored."""
+        
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR with invalid tag values",
+            pr_body,
+            branch_name,
+        )
+        
+        # Wait for triage label to be added (from the existing triage workflow)
+        triage_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
+        
+        # Wait a bit more to ensure release/backport workflow has time to run
+        time.sleep(30)
+        
+        # Verify no release/backport labels are present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        release_labels = [label for label in labels if label.startswith("release")]
+        backport_labels = [label for label in labels if label.startswith("backport")]
+        
+        assert len(release_labels) == 0, f"No release labels should be present, but found: {release_labels}"
+        assert len(backport_labels) == 0, f"No backport labels should be present, but found: {backport_labels}"
+        
+        # Specifically verify the invalid labels are not present
+        assert "release 99.99" not in labels, f"Invalid 'release 99.99' label should not be present"
+        assert "backport invalid-branch" not in labels, f"Invalid 'backport invalid-branch' label should not be present"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)

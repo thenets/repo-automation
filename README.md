@@ -113,9 +113,16 @@ Automatically adds release and backport labels to pull requests based on YAML co
 **Behavior**:
 - Scans the PR description for YAML code blocks
 - Parses `release` and `backport` values from YAML
+- Validates values against accepted lists (see below)
 - Adds corresponding labels (e.g., `release 1.5`, `backport 1.4`)
 - Ignores comments after `#` in YAML values
 - Only processes the first YAML block found with valid content
+
+**Accepted Values**:
+- **Release tags**: `1.0`, `1.1`, `1.2`, `1.3`, `1.4`, `1.5`, `1.6`, `2.0`, `2.1`, `2.2`, `devel`, `main`
+- **Backport tags**: `1.0`, `1.1`, `1.2`, `1.3`, `1.4`, `1.5`, `1.6`, `2.0`, `2.1`, `2.2`, `main`
+
+*Note: Values not in these lists will be ignored and no labels will be added.*
 
 **Supported YAML format**:
 

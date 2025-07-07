@@ -16,12 +16,24 @@ jobs:
     # this is used to prevent the workflow from running on other repos/forks
     if: github.repository == 'thenets/repo-automations'
 
+    env:
+      # Define accepted release and backport values
+      ACCEPTED_RELEASES: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2", "devel"]'
+      ACCEPTED_BACKPORTS: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2"]'
+
     steps:
       - name: Parse YAML from PR description and add labels
         uses: actions/github-script@v7
         with:
           script: |
             console.log(`Processing PR #${context.issue.number}`);
+
+            // Get accepted values from environment variables
+            const acceptedReleases = JSON.parse(process.env.ACCEPTED_RELEASES);
+            const acceptedBackports = JSON.parse(process.env.ACCEPTED_BACKPORTS);
+            
+            console.log(`Accepted releases: ${acceptedReleases.join(', ')}`);
+            console.log(`Accepted backports: ${acceptedBackports.join(', ')}`);
 
             // Get PR description
             const prBody = context.payload.pull_request.body || '';
@@ -45,16 +57,28 @@ jobs:
 
               if (releaseMatch) {
                 const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim();
-                releaseLabel = `release ${releaseValue}`;
-                console.log(`Found release: ${releaseValue}`);
-                yamlFound = true;
+                
+                // Validate release value against accepted list
+                if (acceptedReleases.includes(releaseValue)) {
+                  releaseLabel = `release ${releaseValue}`;
+                  console.log(`Found valid release: ${releaseValue}`);
+                  yamlFound = true;
+                } else {
+                  console.log(`Invalid release value: ${releaseValue}. Accepted values: ${acceptedReleases.join(', ')}`);
+                }
               }
 
               if (backportMatch) {
                 const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim();
-                backportLabel = `backport ${backportValue}`;
-                console.log(`Found backport: ${backportValue}`);
-                yamlFound = true;
+                
+                // Validate backport value against accepted list
+                if (acceptedBackports.includes(backportValue)) {
+                  backportLabel = `backport ${backportValue}`;
+                  console.log(`Found valid backport: ${backportValue}`);
+                  yamlFound = true;
+                } else {
+                  console.log(`Invalid backport value: ${backportValue}. Accepted values: ${acceptedBackports.join(', ')}`);
+                }
               }
 
               // Stop after finding the first YAML block with valid content
@@ -62,7 +86,7 @@ jobs:
             }
 
             if (!yamlFound) {
-              console.log('No YAML code blocks found in PR description');
+              console.log('No valid YAML code blocks found in PR description');
               return;
             }
 
