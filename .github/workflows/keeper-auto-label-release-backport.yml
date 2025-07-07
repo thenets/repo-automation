@@ -35,6 +35,23 @@ jobs:
             console.log(`Accepted releases: ${acceptedReleases.join(', ')}`);
             console.log(`Accepted backports: ${acceptedBackports.join(', ')}`);
 
+            // Get existing labels on the PR
+            const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const existingLabelNames = existingLabels.map(label => label.name);
+            console.log(`Existing labels: ${existingLabelNames.join(', ')}`);
+
+            // Check if release/backport labels already exist
+            const hasReleaseLabel = existingLabelNames.some(label => label.startsWith('release '));
+            const hasBackportLabel = existingLabelNames.some(label => label.startsWith('backport '));
+
+            console.log(`Has existing release label: ${hasReleaseLabel}`);
+            console.log(`Has existing backport label: ${hasBackportLabel}`);
+
             // Get PR description
             const prBody = context.payload.pull_request.body || '';
             console.log(`PR description:\n${prBody}`);
@@ -61,8 +78,11 @@ jobs:
                 if (releaseValue === '') {
                   // Empty value - skip gracefully
                   console.log('Empty release value found, skipping');
+                } else if (hasReleaseLabel) {
+                  // Release label already exists - skip to preserve existing label
+                  console.log(`Release label already exists, skipping automatic assignment of "release ${releaseValue}"`);
                 } else if (acceptedReleases.includes(releaseValue)) {
-                  // Valid value - add label
+                  // Valid value and no existing label - add label
                   releaseLabel = `release ${releaseValue}`;
                   console.log(`Found valid release: ${releaseValue}`);
                   yamlFound = true;
@@ -80,8 +100,11 @@ jobs:
                 if (backportValue === '') {
                   // Empty value - skip gracefully
                   console.log('Empty backport value found, skipping');
+                } else if (hasBackportLabel) {
+                  // Backport label already exists - skip to preserve existing label
+                  console.log(`Backport label already exists, skipping automatic assignment of "backport ${backportValue}"`);
                 } else if (acceptedBackports.includes(backportValue)) {
-                  // Valid value - add label
+                  // Valid value and no existing label - add label
                   backportLabel = `backport ${backportValue}`;
                   console.log(`Found valid backport: ${backportValue}`);
                   yamlFound = true;

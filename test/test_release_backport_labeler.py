@@ -535,3 +535,122 @@ The empty values above should be handled gracefully without workflow failure."""
         
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_existing_labels_preserved_on_description_update(self, test_repo, integration_manager):
+        """Test that existing release/backport labels are preserved when PR description is updated.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with YAML code block
+        5. Wait for initial labels to be added
+        6. Manually add different release/backport labels
+        7. Update PR description with different YAML values
+        8. Verify original manually-set labels are preserved
+        9. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Ensure required labels exist
+        integration_manager.create_label(repo_path, "release 1.2", "00FF00", "Release 1.2")
+        integration_manager.create_label(repo_path, "backport 1.1", "0000FF", "Backport to 1.1")
+        integration_manager.create_label(repo_path, "release 2.0", "FF0000", "Release 2.0")
+        integration_manager.create_label(repo_path, "backport 2.1", "00FFFF", "Backport to 2.1")
+        
+        # Create a new branch
+        branch_name = f"test-preserve-labels-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Create a simple file change
+        test_file = repo_path / "test_preserve_labels.md"
+        content = """# Test File - Preserve Labels
+
+This file contains changes to test label preservation behavior.
+"""
+        test_file.write_text(content)
+        
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file for label preservation", ["test_preserve_labels.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+        
+        # Create PR with initial YAML code block
+        initial_pr_body = """This PR tests that existing labels are preserved when description is updated.
+
+```yaml
+release: 1.2
+backport: 1.1
+```
+
+Initial release and backport configuration."""
+        
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR for label preservation",
+            initial_pr_body,
+            branch_name,
+        )
+        
+        # Wait for initial labels to be added
+        initial_release_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "release 1.2"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        initial_backport_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "backport 1.1"),
+            timeout=120,
+            poll_interval=5,
+        )
+        
+        assert initial_release_added, f"Initial release label was not added to PR #{pr_number}"
+        assert initial_backport_added, f"Initial backport label was not added to PR #{pr_number}"
+        
+        # Manually add different release/backport labels (simulating manual override)
+        integration_manager.add_labels_to_pr(repo_path, pr_number, ["release 2.0", "backport 2.1"])
+        
+        # Remove the initial labels to simulate manual change
+        integration_manager.remove_labels_from_pr(repo_path, pr_number, ["release 1.2", "backport 1.1"])
+        
+        # Wait a moment for label changes to be processed
+        time.sleep(5)
+        
+        # Verify the manual labels are in place
+        labels_after_manual_change = integration_manager.get_pr_labels(repo_path, pr_number)
+        assert "release 2.0" in labels_after_manual_change, f"Manual release label not found in: {labels_after_manual_change}"
+        assert "backport 2.1" in labels_after_manual_change, f"Manual backport label not found in: {labels_after_manual_change}"
+        
+        # Update PR description with different YAML values
+        updated_pr_body = """This PR tests that existing labels are preserved when description is updated.
+
+```yaml
+release: 1.5  # This should be ignored since release 2.0 already exists
+backport: 1.4  # This should be ignored since backport 2.1 already exists
+```
+
+Updated release and backport configuration (should be ignored)."""
+        
+        # Update the PR description (this simulates synchronize event)
+        subprocess.run([
+            "gh", "pr", "edit", pr_number, "--body", updated_pr_body
+        ], cwd=repo_path, check=True)
+        
+        # Wait for workflow to process the description update
+        time.sleep(10)
+        
+        # Verify that the manually-set labels are preserved (not overwritten)
+        final_labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        
+        # Original manually-set labels should still be present
+        assert "release 2.0" in final_labels, f"Manual release label should be preserved, but got: {final_labels}"
+        assert "backport 2.1" in final_labels, f"Manual backport label should be preserved, but got: {final_labels}"
+        
+        # New labels from updated description should NOT be added
+        assert "release 1.5" not in final_labels, f"New release label should not be added when existing label present"
+        assert "backport 1.4" not in final_labels, f"New backport label should not be added when existing label present"
+        
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)

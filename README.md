@@ -120,6 +120,7 @@ Automatically adds release and backport labels to pull requests based on YAML co
 
 **Validation Rules**:
 - **Empty values** (e.g., `release:` with no value) → Workflow exits gracefully
+- **Existing labels** → Skips assignment to preserve manually set labels
 - **Valid values** (from accepted lists) → Labels are added successfully  
 - **Invalid values** (not in accepted lists) → **Workflow fails with error**
 
