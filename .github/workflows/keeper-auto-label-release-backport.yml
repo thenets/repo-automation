@@ -3,7 +3,7 @@ name: "Keeper: auto-label release and backport from PR description"
 
 'on':
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, edited]
 
 permissions:
   pull-requests: write
