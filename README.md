@@ -322,7 +322,22 @@ flowchart LR
 
 ## Testing
 
-- Create test issues and PRs to verify auto-labeling
-- Test label removal scenarios with and without release/backport labels
-- Test stale PR detection by creating PRs and waiting >1 day
-- Verify workflows don't interfere with each other
+### Prerequisites for Testing
+
+1. **Fork this repository** to your GitHub account
+2. **Update repository references** in all workflow files:
+   - Change `if: github.repository == 'thenets/repo-automations'` to `if: github.repository == 'your-username/repo-automations'`
+   - This line appears in all `keeper-*.yml` workflow files under `.github/workflows/`
+
+### Automated Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+make test
+
+# Run specific test method
+make venv
+./venv/bin/pytest -k test_stale_pr_detection_manual_trigger -v
+```

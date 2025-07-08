@@ -45,18 +45,6 @@ test: venv ## Run tests
 	./venv/bin/pytest -v
 	@echo "Tests completed!"
 
-.PHONY: test-integration
-test-integration: venv ## Run integration tests (requires gh CLI and GitHub auth)
-	@echo "Running integration tests..."
-	./venv/bin/pytest -v -m integration
-	@echo "Integration tests completed!"
-
-.PHONY: test-all
-test-all: venv ## Run all tests including integration
-	@echo "Running all tests..."
-	./venv/bin/pytest -v
-	@echo "All tests completed!"
-
 clean: ## Clean up temporary files
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -delete
