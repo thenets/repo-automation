@@ -201,6 +201,39 @@ class GitHubTestManager:
         pr_url = pr_result.stdout.strip()
         return pr_url.split("/")[-1]
 
+    def create_draft_pr(
+        self, repo_path: Path, title: str, body: str, head: str, base: str = "main"
+    ) -> str:
+        """Create a draft pull request and return the PR number."""
+        # Add suffix to title based on local repository path
+        suffix = self._get_repo_suffix(repo_path)
+        title_with_suffix = f"{title} {suffix}"
+
+        pr_result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "create",
+                "--title",
+                title_with_suffix,
+                "--body",
+                body,
+                "--head",
+                head,
+                "--base",
+                base,
+                "--draft",
+            ],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Extract PR number from output
+        pr_url = pr_result.stdout.strip()
+        return pr_url.split("/")[-1]
+
     def create_issue(self, repo_path: Path, title: str, body: str) -> str:
         """Create an issue and return the issue number."""
         # Add suffix to title based on local repository path
@@ -356,6 +389,18 @@ class GitHubTestManager:
         except subprocess.CalledProcessError:
             return False
 
+    def mark_pr_ready_for_review(self, repo_path: Path, pr_number: str) -> bool:
+        """Mark a draft PR as ready for review."""
+        try:
+            subprocess.run(
+                ["gh", "pr", "ready", pr_number],
+                cwd=repo_path,
+                check=True,
+            )
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
 
 class GitHubFixtures:
     """Aggregates all GitHub-related fixtures for testing."""
@@ -411,6 +456,79 @@ class GitHubFixtures:
 @pytest.mark.integration
 class TestTriageAutoAdd(GitHubFixtures):
     """Integration test cases for the triage auto-add workflow."""
+
+    def test_pr_triage_label_draft_must_be_ignored(self, test_repo, integration_manager):
+        """Test that a draft PR does not get the triage label.
+
+        Steps:
+        1. Create a new branch and PR in draft state
+        2. Verify that the triage label is not added
+        3. Mark PR as ready for review
+        4. Verify that the triage label is added
+        5. Cleanup PR
+        """
+        repo_path = test_repo
+
+        # Create a new branch
+        branch_name = f"test-draft-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+
+        # Modify TESTING.md
+        testing_file = repo_path / "TESTING.md"
+        current_content = testing_file.read_text()
+        new_content = (
+            current_content
+            + f"\n\n## Test Draft PR {int(time.time())}\n\nThis tests draft PR triage label behavior.\n"
+        )
+        testing_file.write_text(new_content)
+
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Test draft PR triage label behavior", ["TESTING.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+
+        # Create draft PR
+        pr_number = integration_manager.create_draft_pr(
+            repo_path,
+            "Test Draft PR for triage automation",
+            "This draft PR tests that triage labels are not added to draft PRs.",
+            branch_name,
+        )
+
+        # Wait a moment for any potential automation to run
+        time.sleep(30)
+
+        # Verify that the triage label is NOT added to the draft PR
+        has_triage_label = integration_manager.pr_has_label(repo_path, pr_number, "triage")
+        assert not has_triage_label, (
+            f"Triage label should not be added to draft PR #{pr_number}"
+        )
+
+        # Mark PR as ready for review
+        ready_success = integration_manager.mark_pr_ready_for_review(repo_path, pr_number)
+        assert ready_success, f"Failed to mark PR #{pr_number} as ready for review"
+
+        # Wait for the GitHub Actions workflow to process the ready for review event
+        label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5,
+        )
+
+        assert label_added, (
+            f"Triage label was not added to PR #{pr_number} after marking as ready for review"
+        )
+
+        # Verify the label is indeed present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        assert "triage" in labels, (
+            f"Expected 'triage' label on PR #{pr_number}, but got: {labels}"
+        )
+
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
 
     def test_pr_triage_label_auto_add(self, test_repo, integration_manager):
         """Test that a new PR automatically gets the triage label.

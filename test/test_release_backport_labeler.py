@@ -199,6 +199,138 @@ These changes are for the development branch."""
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
+    @pytest.mark.parametrize(
+        "yaml_format,test_description",
+        [
+            ("clean", "without comments"),
+            ("with_comments", "with hash comments"),
+        ],
+    )
+    def test_yaml_code_block_edit_description(self, test_repo, integration_manager, yaml_format, test_description):
+        """Test that editing the PR description with a YAML code block updates the labels.
+
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with no YAML code block in description
+        5. Edit the PR description with a YAML code block
+           Parametrized to test:
+            - YAML code block without '#' comment
+            - YAML code block with '#' comment
+        6. Verify correct labels are present
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Ensure required labels exist
+        integration_manager.create_label(
+            repo_path, "release 1.0", "00FF00", "Release 1.0"
+        )
+        integration_manager.create_label(
+            repo_path, "backport 1.1", "0000FF", "Backport to 1.1"
+        )
+
+        # Create a new branch
+        branch_name = f"test-edit-description-{yaml_format}-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+
+        # Create a simple file change
+        test_file = repo_path / f"test_edit_description_{yaml_format}.md"
+        content = f"""# Test File - Edit Description {test_description}
+
+This file contains changes to test PR description editing {test_description}.
+"""
+        test_file.write_text(content)
+
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, f"Add test file for description editing {test_description}", [f"test_edit_description_{yaml_format}.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+
+        # Create PR with no YAML code block in description
+        initial_pr_body = f"""This PR tests editing the description to add YAML code blocks {test_description}.
+
+No YAML configuration initially."""
+
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            f"Test PR for description editing {test_description}",
+            initial_pr_body,
+            branch_name,
+        )
+
+        # Wait for triage label to be added (from existing triage workflow)
+        triage_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
+            timeout=120,
+            poll_interval=5,
+        )
+
+        assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
+
+        # Verify no release/backport labels initially
+        initial_labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        release_labels = [label for label in initial_labels if label.startswith("release")]
+        backport_labels = [label for label in initial_labels if label.startswith("backport")]
+        
+        assert len(release_labels) == 0, f"Expected no release labels initially, got: {release_labels}"
+        assert len(backport_labels) == 0, f"Expected no backport labels initially, got: {backport_labels}"
+
+        # Prepare the YAML content based on the parameter
+        if yaml_format == "clean":
+            yaml_content = """```yaml
+release: 1.0
+backport: 1.1
+```"""
+            description_suffix = "This should add the release and backport labels."
+        elif yaml_format == "with_comments":
+            yaml_content = """```yaml
+release: 1.0#this is a comment
+backport: 1.1#another comment
+```"""
+            description_suffix = "The '#' character and everything after it should be removed by the current implementation."
+
+        # Update the PR description with the parameterized YAML content
+        updated_pr_body = f"""This PR tests editing the description to add YAML code blocks {test_description}.
+
+{yaml_content}
+
+{description_suffix}"""
+
+        # Update the PR description
+        subprocess.run(
+            ["gh", "pr", "edit", pr_number, "--body", updated_pr_body],
+            cwd=repo_path,
+            check=True,
+        )
+
+        # Wait for labels to be added
+        release_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "release 1.0"),
+            timeout=120,
+            poll_interval=5,
+        )
+
+        backport_label_added = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_label(repo_path, pr_number, "backport 1.1"),
+            timeout=120,
+            poll_interval=5,
+        )
+
+        assert release_label_added, f"Release label was not added after description update to PR #{pr_number} ({test_description})"
+        assert backport_label_added, f"Backport label was not added after description update to PR #{pr_number} ({test_description})"
+
+        # Verify the labels are present
+        updated_labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        assert "release 1.0" in updated_labels, f"Expected 'release 1.0' label after update ({test_description}), got: {updated_labels}"
+        assert "backport 1.1" in updated_labels, f"Expected 'backport 1.1' label after update ({test_description}), got: {updated_labels}"
+
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    
     def test_release_only_labeling(self, test_repo, integration_manager):
         """Test that PR with only release info gets only release label.
 
