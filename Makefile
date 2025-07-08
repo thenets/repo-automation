@@ -74,3 +74,7 @@ clean: ## Clean up temporary files
 .PHONY: debug-gh-list-pr
 debug-gh-list-pr: ## List all PRs
 	gh pr list --state all --limit 10
+
+debug-clean-prs-and-branches: ## Close all PRs and delete branches
+	gh pr list --state open --limit 1000 | awk '{print $$1}' | xargs -I {} gh pr close {}
+	gh api repos/:owner/:repo/git/refs/heads | jq -r '.[] | select(.ref != "refs/heads/main") | .ref | sub("refs/heads/"; "")' | xargs -I {} gh api -X DELETE repos/:owner/:repo/git/refs/heads/{}
