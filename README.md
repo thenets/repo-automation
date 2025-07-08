@@ -10,7 +10,7 @@ This repository contains GitHub Actions workflows to automate common development
   - [3. Keeper: stale PR detector](#3-keeper-stale-pr-detector) ✅ **Implemented**
   - [4. Keeper: auto-label release and backport](#4-keeper-auto-label-release-and-backport) ✅ **Implemented**
   - [5. Keeper: closed PR label cleanup](#5-keeper-closed-pr-label-cleanup) 📝 **Planned**
-  - [6. Keeper: feature branch auto-labeling](#6-keeper-feature-branch-auto-labeling) 📝 **Planned**
+  - [6. Keeper: feature branch auto-labeling](#6-keeper-feature-branch-auto-labeling) ✅ **Implemented**
   - [7. Keeper: enhanced triage label management](#7-keeper-enhanced-triage-label-management) 📝 **Planned**
 - [Workflow Structure](#workflow-structure)
 - [Implementation Plan](#implementation-plan)
