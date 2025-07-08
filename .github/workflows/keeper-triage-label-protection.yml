@@ -58,7 +58,7 @@ jobs:
             }
 
       - name: Protect triage label on pull request
-        if: github.event_name == 'pull_request' && github.event.action == 'unlabeled' && github.event.label.name == 'triage'
+        if: github.event_name == 'pull_request' && github.event.action == 'unlabeled' && github.event.label.name == 'triage' && !github.event.pull_request.draft
         uses: actions/github-script@v7
         with:
           script: |
