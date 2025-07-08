@@ -1,4 +1,8 @@
 ---
+# GitHub Repository Automations - Keeper: auto-add triage label
+# MIT License - Copyright (c) 2025 Luiz Felipe F M Costa
+# Source: https://github.com/thenets/repo-automations
+
 name: "Keeper: auto-add triage label"
 
 'on':

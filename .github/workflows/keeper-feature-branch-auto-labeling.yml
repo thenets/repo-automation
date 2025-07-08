@@ -1,4 +1,8 @@
 ---
+# GitHub Repository Automations - Keeper: feature branch auto-labeling
+# MIT License - Copyright (c) 2025 Luiz Felipe F M Costa
+# Source: https://github.com/thenets/repo-automations
+
 name: "Keeper: feature branch auto-labeling from PR description"
 
 'on':

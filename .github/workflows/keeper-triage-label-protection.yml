@@ -1,4 +1,8 @@
 ---
+# GitHub Repository Automations - Keeper: triage label protection
+# MIT License - Copyright (c) 2025 Luiz Felipe F M Costa
+# Source: https://github.com/thenets/repo-automations
+
 name: "Keeper: triage label protection"
 
 'on':
