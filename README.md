@@ -17,6 +17,7 @@ This repository contains GitHub Actions workflows to automate common development
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Testing](#testing)
+- [License](#license)
 
 ## Workflow Structure
 
@@ -341,3 +342,7 @@ make test
 make venv
 ./venv/bin/pytest -k test_stale_pr_detection_manual_trigger -v
 ```
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
