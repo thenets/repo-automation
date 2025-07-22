@@ -17,7 +17,8 @@ class TestBasicFunctionality(GitHubFixtures):
     def test_hello(self, github_manager):
         """Test basic functionality of the GitHubTestManager class."""
         # Create a temporary repository using the existing repo-automations as remote
-        repo_name = f"test-hello-{int(time.time())}"
+        # Generate thread-safe unique repo name for parallel execution
+        repo_name = self.generate_unique_name("test-hello")
         repo_path = github_manager.create_temp_repo(repo_name)
 
         # Verify the repository was created and exists

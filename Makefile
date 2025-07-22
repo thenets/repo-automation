@@ -40,9 +40,9 @@ format: venv ## Format code with ruff
 	./venv/bin/ruff format .
 
 .PHONY: test
-test: venv ## Run tests
-	@echo "Running tests..."
-	./venv/bin/pytest -v
+test: venv ## Run tests (parallel, up to 10 threads)
+	@echo "Running tests (parallel, up to 10 threads)..."
+	./venv/bin/pytest -v -n 10
 	@echo "Tests completed!"
 
 clean: ## Clean up temporary files

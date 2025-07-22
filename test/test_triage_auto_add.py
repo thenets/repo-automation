@@ -7,8 +7,10 @@ to new issues and pull requests.
 
 import json
 import os
+import random
 import subprocess
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -405,6 +407,22 @@ class GitHubTestManager:
 class GitHubFixtures:
     """Aggregates all GitHub-related fixtures for testing."""
 
+    @staticmethod
+    def generate_unique_name(prefix: str) -> str:
+        """Generate a thread-safe unique name for parallel test execution.
+        
+        Args:
+            prefix: The prefix to use for the name (e.g., 'test-repo', 'test-branch')
+            
+        Returns:
+            A unique name with the format: {prefix}-{timestamp}-{thread_id}-{process_id}-{random}
+        """
+        timestamp = time.time()
+        thread_id = threading.get_ident()
+        process_id = os.getpid()
+        random_suffix = random.randint(1000, 9999)
+        return f"{prefix}-{int(timestamp)}-{thread_id}-{process_id}-{random_suffix}"
+
     @pytest.fixture(scope="function")
     def github_manager(self):
         """Create a GitHubTestManager instance for function-scoped tests."""
@@ -423,8 +441,8 @@ class GitHubFixtures:
     @pytest.fixture(scope="class")
     def test_repo(self, github_manager_class):
         """Create a temporary repository that uses the existing repo-automations as remote."""
-        # Create unique repository name with timestamp
-        repo_name = f"test-repo-{int(time.time())}"
+        # Create unique repository name per thread for parallel execution
+        repo_name = self.generate_unique_name("test-repo")
 
         # Create temporary local repository
         repo_path = github_manager_class.create_temp_repo(repo_name)
