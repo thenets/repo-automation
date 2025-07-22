@@ -410,10 +410,10 @@ class GitHubFixtures:
     @staticmethod
     def generate_unique_name(prefix: str) -> str:
         """Generate a thread-safe unique name for parallel test execution.
-        
+
         Args:
             prefix: The prefix to use for the name (e.g., 'test-repo', 'test-branch')
-            
+
         Returns:
             A unique name with the format: {prefix}-{timestamp}-{thread_id}-{process_id}-{random}
         """
