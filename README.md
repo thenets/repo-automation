@@ -130,6 +130,8 @@ Automatically adds release and backport labels to pull requests based on YAML co
 - **Existing labels** → Skips assignment to preserve manually set labels
 - **Valid values** (from accepted lists) → Labels are added successfully  
 - **Invalid values** (not in accepted lists) → **Workflow fails with error**
+- **Quotes** → Both single and double quotes are supported and automatically removed
+- **Case sensitivity** → Values are case-sensitive for release/backport (e.g., `devel` not `Devel`)
 
 **Accepted Values**:
 - **Release tags**: `1.0`, `1.1`, `1.2`, `1.3`, `1.4`, `1.5`, `1.6`, `2.0`, `2.1`, `2.2`, `devel`, `main`
@@ -141,8 +143,10 @@ Automatically adds release and backport labels to pull requests based on YAML co
 
 Include a YAML code block in your PR description:
 ```yaml
-release: 1.5    # Creates "release 1.5" label
-backport: 1.4   # Creates "backport 1.4" label  
+release: 1.5        # Creates "release 1.5" label
+backport: 1.4       # Creates "backport 1.4" label
+release: "devel"    # Quotes are supported (single or double)
+backport: 'main'    # Both single and double quotes work
 ```
 
 **Example PR description**:
@@ -150,8 +154,8 @@ backport: 1.4   # Creates "backport 1.4" label
 > This PR adds new feature X.
 > 
 > ```yaml
-> release: 1.5
-> backport: 1.4
+> release: "1.5"      # Quotes are optional
+> backport: 1.4       # Works with or without quotes
 > ```
 > 
 > The changes are backward compatible.
@@ -210,12 +214,16 @@ Automatically adds "feature-branch" label to pull requests based on YAML code bl
 - **Existing labels** → Skips assignment to preserve manually set labels
 - **Valid values** (`true`, `false`) → Labels are added successfully if `true`
 - **Invalid values** (not boolean) → **Workflow fails with error**
+- **Quotes** → Both single and double quotes are supported and automatically removed
+- **Case insensitive** → Accepts `true`, `True`, `TRUE`, `false`, `False`, `FALSE`, etc.
 
 **Supported YAML format**:
 
 Include a YAML code block in your PR description:
 ```yaml
 needs_feature_branch: true    # Creates "feature-branch" label
+needs_feature_branch: True    # Case-insensitive: True, FALSE, etc.
+needs_feature_branch: "false" # Quotes are supported (single or double)
 release: 1.5                  # Creates "release 1.5" label (existing feature)
 backport: 1.4                 # Creates "backport 1.4" label (existing feature)
 ```
@@ -225,8 +233,8 @@ backport: 1.4                 # Creates "backport 1.4" label (existing feature)
 > This PR adds new feature X that requires a feature branch.
 > 
 > ```yaml
-> needs_feature_branch: true
-> release: 1.5
+> needs_feature_branch: True    # Case-insensitive
+> release: "1.5"                # Quotes are optional
 > backport: 1.4
 > ```
 > 
