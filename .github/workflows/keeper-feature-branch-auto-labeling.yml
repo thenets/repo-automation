@@ -38,18 +38,28 @@ jobs:
     if: github.repository == 'thenets/repo-automations' && github.event.workflow_run.conclusion == 'success'
 
     steps:
+      - name: Download PR metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-metadata
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
       - name: Parse YAML from PR description and add feature-branch label
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
           script: |
-            console.log(`Processing PR #${context.issue.number}`);
+            // Load PR metadata from artifact
+            const fs = require('fs');
+            const prData = JSON.parse(fs.readFileSync('pr-metadata.json', 'utf8'));
+            console.log(`Processing PR #${prData.pr_number} from workflow_run trigger`);
 
             // Get existing labels on the PR
             const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number
+              issue_number: prData.pr_number
             });
 
             const existingLabelNames = existingLabels.map(label => label.name);
@@ -65,8 +75,8 @@ jobs:
               return;
             }
 
-            // Get PR description
-            const prBody = context.payload.pull_request.body || '';
+            // Get PR description from artifact
+            const prBody = prData.body || '';
             console.log(`PR description:\n${prBody}`);
 
             let yamlFound = false;
@@ -124,13 +134,13 @@ jobs:
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: context.issue.number,
+                  issue_number: prData.pr_number,
                   labels: ['feature-branch']
                 });
                 console.log('✅ Successfully added feature-branch label');
               } catch (error) {
                 if (error.status === 403) {
-                  const errorMsg = `❌ Permission denied: Unable to add 'feature-branch' label to PR #${context.issue.number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
+                  const errorMsg = `❌ Permission denied: Unable to add 'feature-branch' label to PR #${prData.pr_number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
                   console.error(errorMsg);
                   console.error('Error details:', error);
                   throw new Error(errorMsg);
@@ -141,27 +151,27 @@ jobs:
                     const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
-                      issue_number: context.issue.number
+                      issue_number: prData.pr_number
                     });
 
                     const hasFeatureBranchLabel = existingLabels.some(label => label.name === 'feature-branch');
                     if (hasFeatureBranchLabel) {
-                      console.log('ℹ️ Feature-branch label already exists on PR #' + context.issue.number + ' - this is expected behavior');
+                      console.log('ℹ️ Feature-branch label already exists on PR #' + prData.pr_number + ' - this is expected behavior');
                     } else {
                       // Label doesn't exist on PR, so 422 means label doesn't exist in repo
-                      const errorMsg = `❌ Failed to add 'feature-branch' label to PR #${context.issue.number}: Label 'feature-branch' does not exist in the repository. Please create the 'feature-branch' label in the repository settings.`;
+                      const errorMsg = `❌ Failed to add 'feature-branch' label to PR #${prData.pr_number}: Label 'feature-branch' does not exist in the repository. Please create the 'feature-branch' label in the repository settings.`;
                       console.error(errorMsg);
                       console.error('Error details:', error);
                       throw new Error(errorMsg);
                     }
                   } catch (listError) {
-                    const errorMsg = `❌ Error checking existing labels on PR #${context.issue.number}: ${listError.message}`;
+                    const errorMsg = `❌ Error checking existing labels on PR #${prData.pr_number}: ${listError.message}`;
                     console.error(errorMsg);
                     console.error('Error details:', listError);
                     throw new Error(errorMsg);
                   }
                 } else {
-                  const errorMsg = `❌ Unexpected error adding feature-branch label to PR #${context.issue.number}: ${error.message}`;
+                  const errorMsg = `❌ Unexpected error adding feature-branch label to PR #${prData.pr_number}: ${error.message}`;
                   console.error(errorMsg);
                   console.error('Error details:', error);
                   throw new Error(errorMsg);
