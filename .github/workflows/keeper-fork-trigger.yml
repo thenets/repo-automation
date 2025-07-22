@@ -39,11 +39,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            console.log(`🔄 Collecting event metadata for #${context.issue.number} (${github.event_name})`);
+            console.log(`🔄 Collecting event metadata for #${context.issue.number} (${context.eventName})`);
 
             // Collect ALL event data as-is, no processing or validation
             let eventData = {
-              event_type: github.event_name,
+              event_type: context.eventName,
               issue_number: context.issue.number,
               repository: `${context.repo.owner}/${context.repo.repo}`,
               action: context.payload.action,
@@ -52,7 +52,7 @@ jobs:
             };
 
             // Add PR-specific data if this is a pull request event
-            if (github.event_name === 'pull_request' && context.payload.pull_request) {
+            if (context.eventName === 'pull_request' && context.payload.pull_request) {
               eventData = {
                 ...eventData,
                 pr_number: context.issue.number,
@@ -71,7 +71,7 @@ jobs:
             }
 
             // Add issue-specific data if this is an issue event
-            if (github.event_name === 'issues' && context.payload.issue) {
+            if (context.eventName === 'issues' && context.payload.issue) {
               eventData = {
                 ...eventData,
                 issue_number: context.issue.number,
