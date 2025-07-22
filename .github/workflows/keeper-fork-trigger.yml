@@ -16,12 +16,15 @@
 name: "Keeper: fork trigger"
 
 on:
+  issues:
+    types: [labeled, unlabeled]
   pull_request:
-    types: [opened, synchronize, edited, ready_for_review]
+    types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
 
 permissions:
   contents: read
   pull-requests: read
+  issues: read
 
 jobs:
   collect-pr-metadata:
@@ -32,31 +35,63 @@ jobs:
     if: github.repository == 'thenets/repo-automations'
 
     steps:
-      - name: Collect PR metadata
+      - name: Collect event metadata
         uses: actions/github-script@v7
         with:
           script: |
-            console.log(`🔄 Collecting PR metadata for #${context.issue.number}`);
+            console.log(`🔄 Collecting event metadata for #${context.issue.number} (${github.event_name})`);
 
-            // Collect ALL PR data as-is, no processing or validation
-            const prData = {
-              pr_number: context.issue.number,
+            // Collect ALL event data as-is, no processing or validation
+            let eventData = {
+              event_type: github.event_name,
+              issue_number: context.issue.number,
               repository: `${context.repo.owner}/${context.repo.repo}`,
-              head_sha: context.payload.pull_request.head.sha,
-              body: context.payload.pull_request.body || '',
-              title: context.payload.pull_request.title,
-              draft: context.payload.pull_request.draft,
               action: context.payload.action,
-              head_repo: context.payload.pull_request.head.repo.full_name,
-              base_repo: context.payload.pull_request.base.repo.full_name,
-              user: context.payload.pull_request.user.login,
-              created_at: context.payload.pull_request.created_at,
-              updated_at: context.payload.pull_request.updated_at,
-              mergeable: context.payload.pull_request.mergeable,
-              state: context.payload.pull_request.state,
               workflow_run_id: context.runId,
               collected_at: new Date().toISOString()
             };
+
+            // Add PR-specific data if this is a pull request event
+            if (github.event_name === 'pull_request' && context.payload.pull_request) {
+              eventData = {
+                ...eventData,
+                pr_number: context.issue.number,
+                head_sha: context.payload.pull_request.head.sha,
+                body: context.payload.pull_request.body || '',
+                title: context.payload.pull_request.title,
+                draft: context.payload.pull_request.draft,
+                head_repo: context.payload.pull_request.head.repo.full_name,
+                base_repo: context.payload.pull_request.base.repo.full_name,
+                user: context.payload.pull_request.user.login,
+                created_at: context.payload.pull_request.created_at,
+                updated_at: context.payload.pull_request.updated_at,
+                mergeable: context.payload.pull_request.mergeable,
+                state: context.payload.pull_request.state
+              };
+            }
+
+            // Add issue-specific data if this is an issue event
+            if (github.event_name === 'issues' && context.payload.issue) {
+              eventData = {
+                ...eventData,
+                issue_number: context.issue.number,
+                body: context.payload.issue.body || '',
+                title: context.payload.issue.title,
+                user: context.payload.issue.user.login,
+                created_at: context.payload.issue.created_at,
+                updated_at: context.payload.issue.updated_at,
+                state: context.payload.issue.state
+              };
+            }
+
+            // Add label data for labeled/unlabeled events
+            if (context.payload.label) {
+              eventData.label = {
+                name: context.payload.label.name,
+                color: context.payload.label.color,
+                description: context.payload.label.description
+              };
+            }
 
             console.log(`📊 PR Data Summary:`);
             console.log(`  - PR #${prData.pr_number}: ${prData.title}`);
@@ -69,15 +104,15 @@ jobs:
 
             // Store as artifact for other workflows to consume
             const fs = require('fs');
-            fs.writeFileSync('pr-metadata.json', JSON.stringify(prData, null, 2));
+            fs.writeFileSync('event-metadata.json', JSON.stringify(eventData, null, 2));
 
             console.log(`✅ PR metadata collected and stored for downstream workflows`);
 
-      - name: Upload PR metadata artifact
+      - name: Upload event metadata artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pr-metadata
-          path: pr-metadata.json
+          name: event-metadata
+          path: event-metadata.json
           retention-days: 7
 
       - name: Summary
