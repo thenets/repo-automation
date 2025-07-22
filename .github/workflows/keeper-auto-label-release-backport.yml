@@ -23,8 +23,9 @@
 name: "Keeper: auto-label release and backport from PR description"
 
 'on':
-  pull_request:
-    types: [opened, synchronize, edited, ready_for_review]
+  workflow_run:
+    workflows: ["Keeper: fork trigger"]
+    types: [completed]
 
 permissions:
   pull-requests: write
@@ -35,7 +36,7 @@ jobs:
 
     # CHANGE THIS: set your repo name here
     # this is used to prevent the workflow from running on other repos/forks
-    if: github.repository == 'thenets/repo-automations' && !github.event.pull_request.draft
+    if: github.repository == 'thenets/repo-automations' && github.event.workflow_run.conclusion == 'success'
 
     env:
       # Define accepted release and backport values

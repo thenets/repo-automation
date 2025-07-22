@@ -1,0 +1,96 @@
+---
+# GitHub Repository Automations - Keeper: fork trigger
+# MIT License - Copyright (c) 2025 Luiz Felipe F M Costa
+# Source: https://github.com/thenets/repo-automations
+#
+# This workflow collects PR metadata from any repository (including forks)
+# and stores it as an artifact for other workflows to consume.
+# This enables fork compatibility while maintaining security.
+#
+# DESIGN PRINCIPLE:
+# - Collect ALL PR metadata as-is without processing
+# - No secrets required (read-only permissions)
+# - Runs on any repository including forks
+# - Single source of truth for PR data
+
+name: "Keeper: fork trigger"
+
+on:
+  pull_request:
+    types: [opened, synchronize, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  collect-pr-metadata:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Collect PR metadata
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log(`🔄 Collecting PR metadata for #${context.issue.number}`);
+
+            // Collect ALL PR data as-is, no processing or validation
+            const prData = {
+              pr_number: context.issue.number,
+              repository: `${context.repo.owner}/${context.repo.repo}`,
+              head_sha: context.payload.pull_request.head.sha,
+              body: context.payload.pull_request.body || '',
+              title: context.payload.pull_request.title,
+              draft: context.payload.pull_request.draft,
+              action: context.payload.action,
+              head_repo: context.payload.pull_request.head.repo.full_name,
+              base_repo: context.payload.pull_request.base.repo.full_name,
+              user: context.payload.pull_request.user.login,
+              created_at: context.payload.pull_request.created_at,
+              updated_at: context.payload.pull_request.updated_at,
+              mergeable: context.payload.pull_request.mergeable,
+              state: context.payload.pull_request.state,
+              workflow_run_id: context.runId,
+              collected_at: new Date().toISOString()
+            };
+
+            console.log(`📊 PR Data Summary:`);
+            console.log(`  - PR #${prData.pr_number}: ${prData.title}`);
+            console.log(`  - Repository: ${prData.repository}`);
+            console.log(`  - Head Repo: ${prData.head_repo}`);
+            console.log(`  - Base Repo: ${prData.base_repo}`);
+            console.log(`  - Action: ${prData.action}`);
+            console.log(`  - Draft: ${prData.draft}`);
+            console.log(`  - User: ${prData.user}`);
+
+            // Store as artifact for other workflows to consume
+            const fs = require('fs');
+            fs.writeFileSync('pr-metadata.json', JSON.stringify(prData, null, 2));
+
+            console.log(`✅ PR metadata collected and stored for downstream workflows`);
+
+      - name: Upload PR metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-metadata
+          path: pr-metadata.json
+          retention-days: 7
+
+      - name: Summary
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          {
+            echo "🎯 Fork Trigger Workflow Complete"
+            echo "- **PR**: #${PR_NUMBER} - ${PR_TITLE}"
+            echo "- **Repository**: ${REPOSITORY}"
+            echo "- **Head Repo**: ${HEAD_REPO}"
+            echo "- **Action**: ${ACTION}"
+            echo "- **Artifact**: pr-metadata.json uploaded ✅"
+            echo ""
+            echo "This metadata will be consumed by action workflows on the target repository."
+          } >> "$GITHUB_STEP_SUMMARY"
