@@ -44,12 +44,22 @@ jobs:
       ACCEPTED_BACKPORTS: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2"]'
 
     steps:
+      - name: Download PR metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-metadata
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
       - name: Parse YAML from PR description and add labels
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
           script: |
-            console.log(`Processing PR #${context.issue.number}`);
+            // Load PR metadata from artifact
+            const fs = require('fs');
+            const prData = JSON.parse(fs.readFileSync('pr-metadata.json', 'utf8'));
+            console.log(`Processing PR #${prData.pr_number} from workflow_run trigger`);
 
             // Get accepted values from environment variables
             const acceptedReleases = JSON.parse(process.env.ACCEPTED_RELEASES);
@@ -61,7 +71,7 @@ jobs:
             const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number
+              issue_number: prData.pr_number
             });
 
             const existingLabelNames = existingLabels.map(label => label.name);
@@ -74,8 +84,8 @@ jobs:
             console.log(`Has existing release label: ${hasReleaseLabel}`);
             console.log(`Has existing backport label: ${hasBackportLabel}`);
 
-            // Get PR description
-            const prBody = context.payload.pull_request.body || '';
+            // Get PR description from artifact
+            const prBody = prData.body || '';
             console.log(`PR description:\n${prBody}`);
 
             let yamlFound = false;
@@ -157,13 +167,13 @@ jobs:
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: context.issue.number,
+                  issue_number: prData.pr_number,
                   labels: labelsToAdd
                 });
                 console.log(`✅ Successfully added labels: ${labelsToAdd.join(', ')}`);
               } catch (error) {
                 if (error.status === 403) {
-                  const errorMsg = `❌ Permission denied: Unable to add labels "${labelsToAdd.join(', ')}" to PR #${context.issue.number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Issues: Write' and 'Pull requests: Write' permissions.`;
+                  const errorMsg = `❌ Permission denied: Unable to add labels "${labelsToAdd.join(', ')}" to PR #${prData.pr_number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Issues: Write' and 'Pull requests: Write' permissions.`;
                   console.error(errorMsg);
                   console.error('Error details:', error);
                   throw new Error(errorMsg);
@@ -174,29 +184,29 @@ jobs:
                     const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
                       owner: context.repo.owner,
                       repo: context.repo.repo,
-                      issue_number: context.issue.number
+                      issue_number: prData.pr_number
                     });
 
                     const existingLabelNames = existingLabels.map(label => label.name);
                     const missingLabels = labelsToAdd.filter(label => !existingLabelNames.includes(label));
 
                     if (missingLabels.length === 0) {
-                      console.log(`ℹ️ All labels ${labelsToAdd.join(', ')} already exist on PR #${context.issue.number} - this is expected behavior`);
+                      console.log(`ℹ️ All labels ${labelsToAdd.join(', ')} already exist on PR #${prData.pr_number} - this is expected behavior`);
                     } else {
                       // Some labels don't exist on PR, so 422 likely means they don't exist in repo
-                      const errorMsg = `❌ Failed to add labels "${missingLabels.join(', ')}" to PR #${context.issue.number}: One or more labels do not exist in the repository. Please create the missing labels in the repository settings.`;
+                      const errorMsg = `❌ Failed to add labels "${missingLabels.join(', ')}" to PR #${prData.pr_number}: One or more labels do not exist in the repository. Please create the missing labels in the repository settings.`;
                       console.error(errorMsg);
                       console.error('Error details:', error);
                       throw new Error(errorMsg);
                     }
                   } catch (listError) {
-                    const errorMsg = `❌ Error checking existing labels on PR #${context.issue.number}: ${listError.message}`;
+                    const errorMsg = `❌ Error checking existing labels on PR #${prData.pr_number}: ${listError.message}`;
                     console.error(errorMsg);
                     console.error('Error details:', listError);
                     throw new Error(errorMsg);
                   }
                 } else {
-                  const errorMsg = `❌ Unexpected error adding labels to PR #${context.issue.number}: ${error.message}`;
+                  const errorMsg = `❌ Unexpected error adding labels to PR #${prData.pr_number}: ${error.message}`;
                   console.error(errorMsg);
                   console.error('Error details:', error);
                   throw new Error(errorMsg);
