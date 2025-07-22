@@ -29,6 +29,7 @@ name: "Keeper: auto-label release and backport from PR description"
 
 permissions:
   pull-requests: write
+  checks: write
 
 jobs:
   auto-label-release-backport:
