@@ -42,10 +42,10 @@ jobs:
       ACCEPTED_BACKPORTS: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2"]'
 
     steps:
-      - name: Download PR metadata
+      - name: Download event metadata
         uses: actions/download-artifact@v4
         with:
-          name: pr-metadata
+          name: event-metadata
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
@@ -54,9 +54,9 @@ jobs:
         with:
           github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
           script: |
-            // Load PR metadata from artifact
+            // Load event metadata from artifact
             const fs = require('fs');
-            const prData = JSON.parse(fs.readFileSync('pr-metadata.json', 'utf8'));
+            const prData = JSON.parse(fs.readFileSync('event-metadata.json', 'utf8'));
             console.log(`Processing PR #${prData.pr_number} from workflow_run trigger`);
 
             // Get accepted values from environment variables

@@ -108,9 +108,9 @@ jobs:
         with:
           github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
           script: |
-            // Load PR metadata from artifact
+            // Load event metadata from artifact
             const fs = require('fs');
-            const prData = JSON.parse(fs.readFileSync('pr-metadata.json', 'utf8'));
+            const prData = JSON.parse(fs.readFileSync('event-metadata.json', 'utf8'));
             console.log(`Processing PR #${prData.pr_number} from workflow_run trigger`);
 
             // Skip if draft PR
