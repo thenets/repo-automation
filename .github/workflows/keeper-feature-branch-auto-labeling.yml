@@ -22,8 +22,9 @@
 name: "Keeper: feature branch auto-labeling from PR description"
 
 'on':
-  pull_request:
-    types: [opened, synchronize, edited, ready_for_review]
+  workflow_run:
+    workflows: ["Keeper: fork trigger"]
+    types: [completed]
 
 permissions:
   pull-requests: write
@@ -34,7 +35,7 @@ jobs:
 
     # CHANGE THIS: set your repo name here
     # this is used to prevent the workflow from running on other repos/forks
-    if: github.repository == 'thenets/repo-automations' && !github.event.pull_request.draft
+    if: github.repository == 'thenets/repo-automations' && github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Parse YAML from PR description and add feature-branch label
