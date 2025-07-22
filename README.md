@@ -13,7 +13,7 @@ This repository contains GitHub Actions workflows to automate common development
   - [6. Keeper: feature branch auto-labeling](#6-keeper-feature-branch-auto-labeling) ✅ **Implemented**
   - [7. Keeper: enhanced triage label management](#7-keeper-enhanced-triage-label-management) 📝 **Planned**
 - [Workflow Structure](#workflow-structure)
-- [Implementation Plan](#implementation-plan)
+- [Fork Compatibility](#fork-compatibility)
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Testing](#testing)
@@ -29,7 +29,8 @@ This repository contains GitHub Actions workflows to automate common development
 ├── keeper-auto-label-release-backport.yml # Auto-labels PRs based on YAML frontmatter
 ├── keeper-closed-pr-label-cleanup.yml     # Removes "ready for review" label from closed PRs
 ├── keeper-feature-branch-auto-labeling.yml # Auto-labels PRs as "feature-branch" based on YAML frontmatter
-└── keeper-enhanced-triage-management.yml  # Enhanced triage label management with release/ready conditions
+├── keeper-enhanced-triage-management.yml  # Enhanced triage label management with release/ready conditions
+└── keeper-fork-trigger.yml                # Fork-compatible data collection workflow
 ```
 
 ## How to use them
@@ -288,30 +289,88 @@ flowchart LR
     E --> G[✅ Complete]
 ```
 
-## Implementation Plan
+## Fork Compatibility
 
-1. **Create Auto-Add Workflow**
-   - Trigger on issue and PR creation
-   - Use GitHub API to add "triage" label
-   - Handle edge cases (label already exists, permissions)
+This repository implements a **fork-compatible architecture** that allows external contributors to trigger labeling workflows seamlessly. The system uses a two-workflow pattern to separate data collection from privileged operations.
 
-2. **Create Protection Workflow**
-   - Trigger on label changes
-   - Check if "triage" was removed
-   - Validate presence of "release *" or "backport *" labels
-   - Re-add "triage" if conditions not met
+### Problem Statement
 
-3. **Create Stale PR Detection Workflow**
-   - Schedule daily execution using cron
-   - Query all open PRs in the repository
-   - Check last activity timestamp for each PR
-   - Add "stale" label to PRs inactive for >1 day
-   - Skip PRs already marked as stale
+Traditional GitHub Actions workflows fail when triggered by pull requests from forks because:
+- Forked repositories don't have access to the original repository's secrets
+- GitHub's default `GITHUB_TOKEN` has limited permissions for external contributors
+- Workflows cannot add labels to pull requests from forks without elevated permissions
 
-4. **Error Handling**
-   - Handle API rate limits
-   - Graceful failure on permission issues
-   - Logging for debugging
+### Solution Architecture
+
+We implement a **two-workflow pattern** that separates data collection from privileged operations:
+
+1. **Data Collection Workflow** (`keeper-fork-trigger`): Runs on any repository (including forks), collects ALL PR metadata as-is
+2. **Action Workflows** (`keeper-*`): Triggered by data collection completion, run only on target repository with full permissions
+
+### Workflow Communication Pattern
+
+```mermaid
+flowchart TD
+    A[PR Created/Updated on Fork] --> FT
+    
+    subgraph FT ["🔄 keeper-fork-trigger.yml (Runs on Fork)"]
+        direction TB
+        B[Collect PR Metadata]
+        C[Extract: title, body, draft, etc.]
+        D[Store as pr-metadata.json]
+        E[Upload Artifact]
+        B --> C --> D --> E
+    end
+    
+    FT --> TG[Trigger Action Workflows]
+    
+    subgraph AW ["🎯 Action Workflows (Run on Target Repo)"]
+        direction TB
+        subgraph FB ["keeper-feature-branch-auto-labeling.yml"]
+            F1[Download Artifact] --> F2[Parse YAML from prData.body] --> F3[Apply feature-branch Label]
+        end
+        
+        subgraph RB ["keeper-auto-label-release-backport.yml"]
+            R1[Download Artifact] --> R2[Parse YAML from prData.body] --> R3[Apply release/backport Labels]
+        end
+        
+        subgraph TR ["keeper-auto-add-triage-label.yml"]
+            T1[Download Artifact] --> T2[Check prData.draft] --> T3[Apply triage Label]
+        end
+    end
+    
+    TG --> FB
+    TG --> RB  
+    TG --> TR
+    
+    FB --> Z[✅ Complete]
+    RB --> Z
+    TR --> Z
+    
+    style A fill:#e1f5fe
+    style FT fill:#fff3e0
+    style AW fill:#f3e5f5
+    style Z fill:#e8f5e8
+```
+
+### Fork Compatibility Status
+
+| Workflow | Fork Compatible | Status | Notes |
+|----------|-----------------|--------|--------|
+| **keeper-fork-trigger.yml** | ✅ N/A | ✅ Working | Data collection workflow |
+| **keeper-auto-add-triage-label.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
+| **keeper-auto-label-release-backport.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
+| **keeper-feature-branch-auto-labeling.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
+| **keeper-triage-label-protection.yml** | ✅ N/A | ✅ No changes needed | Uses labeled/unlabeled |
+| **keeper-stale-pr-detector.yml** | ✅ N/A | ✅ No changes needed | Uses schedule/dispatch |
+
+### Benefits
+
+1. **External Contributor Friendly**: PRs from forks trigger workflows seamlessly
+2. **Security**: Privileged operations only run on target repository  
+3. **Minimal Changes**: Existing logic preserved, just data source changed
+4. **Performance**: Complete workflow chain executes in ~1-2 minutes
+5. **Backward Compatible**: All existing functionality preserved
 
 ## Fine-Grained Token Permissions
 
