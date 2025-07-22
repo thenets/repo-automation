@@ -110,12 +110,17 @@ jobs:
           script: |
             // Load event metadata from artifact
             const fs = require('fs');
-            const prData = JSON.parse(fs.readFileSync('event-metadata.json', 'utf8'));
-            console.log(`Processing PR #${prData.pr_number} from workflow_run trigger`);
+            const eventData = JSON.parse(fs.readFileSync('event-metadata.json', 'utf8'));
+            console.log(`Processing ${eventData.event_type} #${eventData.issue_number} from workflow_run trigger`);
 
-            // Skip if draft PR
-            if (prData.draft) {
-              console.log(`PR #${prData.pr_number} is draft, skipping triage label`);
+            // Only process pull request events, and skip if draft PR
+            if (eventData.event_type !== 'pull_request') {
+              console.log(`Event type ${eventData.event_type} is not a pull request, skipping`);
+              return;
+            }
+
+            if (eventData.draft) {
+              console.log(`PR #${eventData.issue_number} is draft, skipping triage label`);
               return;
             }
 
@@ -123,13 +128,13 @@ jobs:
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: prData.pr_number,
+                issue_number: eventData.issue_number,
                 labels: ['triage']
               });
-              console.log(`✅ Successfully added triage label to PR #${prData.pr_number}`);
+              console.log(`✅ Successfully added triage label to PR #${eventData.issue_number}`);
             } catch (error) {
               if (error.status === 403) {
-                const errorMsg = `❌ Permission denied: Unable to add 'triage' label to PR #${prData.pr_number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
+                const errorMsg = `❌ Permission denied: Unable to add 'triage' label to PR #${eventData.issue_number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
                 console.error(errorMsg);
                 console.error('Error details:', error);
                 throw new Error(errorMsg);
@@ -140,27 +145,27 @@ jobs:
                   const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    issue_number: prData.pr_number
+                    issue_number: eventData.issue_number
                   });
 
                   const hasTriageLabel = existingLabels.some(label => label.name === 'triage');
                   if (hasTriageLabel) {
-                    console.log(`ℹ️ Triage label already exists on PR #${prData.pr_number} - this is expected behavior`);
+                    console.log(`ℹ️ Triage label already exists on PR #${eventData.issue_number} - this is expected behavior`);
                   } else {
                     // Label doesn't exist on PR, so 422 means label doesn't exist in repo
-                    const errorMsg = `❌ Failed to add 'triage' label to PR #${prData.pr_number}: Label 'triage' does not exist in the repository. Please create the 'triage' label in the repository settings.`;
+                    const errorMsg = `❌ Failed to add 'triage' label to PR #${eventData.issue_number}: Label 'triage' does not exist in the repository. Please create the 'triage' label in the repository settings.`;
                     console.error(errorMsg);
                     console.error('Error details:', error);
                     throw new Error(errorMsg);
                   }
                 } catch (listError) {
-                  const errorMsg = `❌ Error checking existing labels on PR #${prData.pr_number}: ${listError.message}`;
+                  const errorMsg = `❌ Error checking existing labels on PR #${eventData.issue_number}: ${listError.message}`;
                   console.error(errorMsg);
                   console.error('Error details:', listError);
                   throw new Error(errorMsg);
                 }
               } else {
-                const errorMsg = `❌ Unexpected error adding triage label to PR #${prData.pr_number}: ${error.message}`;
+                const errorMsg = `❌ Unexpected error adding triage label to PR #${eventData.issue_number}: ${error.message}`;
                 console.error(errorMsg);
                 console.error('Error details:', error);
                 throw new Error(errorMsg);
