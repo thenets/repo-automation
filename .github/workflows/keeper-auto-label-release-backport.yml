@@ -34,9 +34,7 @@ jobs:
   auto-label-release-backport:
     runs-on: ubuntu-latest
 
-    # CHANGE THIS: set your repo name here
-    # this is used to prevent the workflow from running on other repos/forks
-    if: github.repository == 'thenets/repo-automations' && github.event.workflow_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success'
 
     env:
       # Define accepted release and backport values
