@@ -45,6 +45,10 @@ test: venv ## Run tests (parallel, up to 10 threads)
 	./venv/bin/pytest -v -n 10
 	@echo "Tests completed!"
 
+.PHONY: test-list
+test-list: venv ## List all tests
+	./venv/bin/pytest --collect-only
+
 clean: ## Clean up temporary files
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -delete
