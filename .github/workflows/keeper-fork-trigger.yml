@@ -93,20 +93,31 @@ jobs:
               };
             }
 
-            console.log(`📊 PR Data Summary:`);
-            console.log(`  - PR #${prData.pr_number}: ${prData.title}`);
-            console.log(`  - Repository: ${prData.repository}`);
-            console.log(`  - Head Repo: ${prData.head_repo}`);
-            console.log(`  - Base Repo: ${prData.base_repo}`);
-            console.log(`  - Action: ${prData.action}`);
-            console.log(`  - Draft: ${prData.draft}`);
-            console.log(`  - User: ${prData.user}`);
+            console.log(`📊 Event Data Summary:`);
+            console.log(`  - Event Type: ${eventData.event_type}`);
+            console.log(`  - Issue/PR #${eventData.issue_number}`);
+            console.log(`  - Repository: ${eventData.repository}`);
+            console.log(`  - Action: ${eventData.action}`);
+            if (eventData.event_type === 'pull_request') {
+              console.log(`  - PR Title: ${eventData.title}`);
+              console.log(`  - Head Repo: ${eventData.head_repo}`);
+              console.log(`  - Base Repo: ${eventData.base_repo}`);
+              console.log(`  - Draft: ${eventData.draft}`);
+              console.log(`  - User: ${eventData.user}`);
+            }
+            if (eventData.event_type === 'issues') {
+              console.log(`  - Issue Title: ${eventData.title}`);
+              console.log(`  - User: ${eventData.user}`);
+            }
+            if (eventData.label) {
+              console.log(`  - Label: ${eventData.label.name}`);
+            }
 
             // Store as artifact for other workflows to consume
             const fs = require('fs');
             fs.writeFileSync('event-metadata.json', JSON.stringify(eventData, null, 2));
 
-            console.log(`✅ PR metadata collected and stored for downstream workflows`);
+            console.log(`✅ Event metadata collected and stored for downstream workflows`);
 
       - name: Upload event metadata artifact
         uses: actions/upload-artifact@v4
