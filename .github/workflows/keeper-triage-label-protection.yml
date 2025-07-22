@@ -82,8 +82,32 @@ jobs:
                 console.error('Error details:', error);
                 throw new Error(errorMsg);
               } else if (error.status === 422) {
-                console.log('ℹ️ Triage label already exists on issue #' +
-                  context.issue.number + ' - this is expected behavior');
+                // 422 could mean label already exists or label doesn't exist in repo
+                // We need to check which case it is
+                try {
+                  const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.issue.number
+                  });
+
+                  const hasTriageLabel = existingLabels.some(label => label.name === 'triage');
+                  if (hasTriageLabel) {
+                    console.log('ℹ️ Triage label already exists on issue #' +
+                      context.issue.number + ' - this is expected behavior');
+                  } else {
+                    // Label doesn't exist on issue, so 422 means label doesn't exist in repo
+                    const errorMsg = `❌ Failed to re-add 'triage' label to issue #${context.issue.number}: Label 'triage' does not exist in the repository. Please create the 'triage' label in the repository settings.`;
+                    console.error(errorMsg);
+                    console.error('Error details:', error);
+                    throw new Error(errorMsg);
+                  }
+                } catch (listError) {
+                  const errorMsg = `❌ Error checking existing labels on issue #${context.issue.number}: ${listError.message}`;
+                  console.error(errorMsg);
+                  console.error('Error details:', listError);
+                  throw new Error(errorMsg);
+                }
               } else {
                 const errorMsg = `❌ Unexpected error protecting triage label on issue #${context.issue.number}: ${error.message}`;
                 console.error(errorMsg);
@@ -133,8 +157,32 @@ jobs:
                 console.error('Error details:', error);
                 throw new Error(errorMsg);
               } else if (error.status === 422) {
-                console.log('ℹ️ Triage label already exists on PR #' +
-                  context.issue.number + ' - this is expected behavior');
+                // 422 could mean label already exists or label doesn't exist in repo
+                // We need to check which case it is
+                try {
+                  const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: context.issue.number
+                  });
+
+                  const hasTriageLabel = existingLabels.some(label => label.name === 'triage');
+                  if (hasTriageLabel) {
+                    console.log('ℹ️ Triage label already exists on PR #' +
+                      context.issue.number + ' - this is expected behavior');
+                  } else {
+                    // Label doesn't exist on PR, so 422 means label doesn't exist in repo
+                    const errorMsg = `❌ Failed to re-add 'triage' label to PR #${context.issue.number}: Label 'triage' does not exist in the repository. Please create the 'triage' label in the repository settings.`;
+                    console.error(errorMsg);
+                    console.error('Error details:', error);
+                    throw new Error(errorMsg);
+                  }
+                } catch (listError) {
+                  const errorMsg = `❌ Error checking existing labels on PR #${context.issue.number}: ${listError.message}`;
+                  console.error(errorMsg);
+                  console.error('Error details:', listError);
+                  throw new Error(errorMsg);
+                }
               } else {
                 const errorMsg = `❌ Unexpected error protecting triage label on PR #${context.issue.number}: ${error.message}`;
                 console.error(errorMsg);

@@ -165,7 +165,33 @@ jobs:
                   console.error('Error details:', error);
                   throw new Error(errorMsg);
                 } else if (error.status === 422) {
-                  console.log(`ℹ️ Some labels may already exist on PR #${context.issue.number} - this is expected behavior`);
+                  // 422 could mean labels already exist or labels don't exist in repo
+                  // We need to check which case it is
+                  try {
+                    const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: context.issue.number
+                    });
+
+                    const existingLabelNames = existingLabels.map(label => label.name);
+                    const missingLabels = labelsToAdd.filter(label => !existingLabelNames.includes(label));
+
+                    if (missingLabels.length === 0) {
+                      console.log(`ℹ️ All labels ${labelsToAdd.join(', ')} already exist on PR #${context.issue.number} - this is expected behavior`);
+                    } else {
+                      // Some labels don't exist on PR, so 422 likely means they don't exist in repo
+                      const errorMsg = `❌ Failed to add labels "${missingLabels.join(', ')}" to PR #${context.issue.number}: One or more labels do not exist in the repository. Please create the missing labels in the repository settings.`;
+                      console.error(errorMsg);
+                      console.error('Error details:', error);
+                      throw new Error(errorMsg);
+                    }
+                  } catch (listError) {
+                    const errorMsg = `❌ Error checking existing labels on PR #${context.issue.number}: ${listError.message}`;
+                    console.error(errorMsg);
+                    console.error('Error details:', listError);
+                    throw new Error(errorMsg);
+                  }
                 } else {
                   const errorMsg = `❌ Unexpected error adding labels to PR #${context.issue.number}: ${error.message}`;
                   console.error(errorMsg);

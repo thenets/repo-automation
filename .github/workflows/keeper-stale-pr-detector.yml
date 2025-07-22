@@ -98,7 +98,31 @@ jobs:
                         console.error('Error details:', labelError);
                         throw new Error(errorMsg);
                       } else if (labelError.status === 422) {
-                        console.log(`ℹ️ Stale label may already exist on PR #${pr.number} - this is expected behavior`);
+                        // 422 could mean label already exists or label doesn't exist in repo
+                        // We need to check which case it is
+                        try {
+                          const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+                            owner: context.repo.owner,
+                            repo: context.repo.repo,
+                            issue_number: pr.number
+                          });
+
+                          const hasStaleLabel = existingLabels.some(label => label.name === 'stale');
+                          if (hasStaleLabel) {
+                            console.log(`ℹ️ Stale label already exists on PR #${pr.number} - this is expected behavior`);
+                          } else {
+                            // Label doesn't exist on PR, so 422 means label doesn't exist in repo
+                            const errorMsg = `❌ Failed to add 'stale' label to PR #${pr.number}: Label 'stale' does not exist in the repository. Please create the 'stale' label in the repository settings.`;
+                            console.error(errorMsg);
+                            console.error('Error details:', labelError);
+                            throw new Error(errorMsg);
+                          }
+                        } catch (listError) {
+                          const errorMsg = `❌ Error checking existing labels on PR #${pr.number}: ${listError.message}`;
+                          console.error(errorMsg);
+                          console.error('Error details:', listError);
+                          throw new Error(errorMsg);
+                        }
                       } else {
                         const errorMsg = `❌ Unexpected error adding stale label to PR #${pr.number}: ${labelError.message}`;
                         console.error(errorMsg);

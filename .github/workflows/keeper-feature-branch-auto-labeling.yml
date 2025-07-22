@@ -132,7 +132,31 @@ jobs:
                   console.error('Error details:', error);
                   throw new Error(errorMsg);
                 } else if (error.status === 422) {
-                  console.log('ℹ️ Feature-branch label may already exist on PR #' + context.issue.number + ' - this is expected behavior');
+                  // 422 could mean label already exists or label doesn't exist in repo
+                  // We need to check which case it is
+                  try {
+                    const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: context.issue.number
+                    });
+
+                    const hasFeatureBranchLabel = existingLabels.some(label => label.name === 'feature-branch');
+                    if (hasFeatureBranchLabel) {
+                      console.log('ℹ️ Feature-branch label already exists on PR #' + context.issue.number + ' - this is expected behavior');
+                    } else {
+                      // Label doesn't exist on PR, so 422 means label doesn't exist in repo
+                      const errorMsg = `❌ Failed to add 'feature-branch' label to PR #${context.issue.number}: Label 'feature-branch' does not exist in the repository. Please create the 'feature-branch' label in the repository settings.`;
+                      console.error(errorMsg);
+                      console.error('Error details:', error);
+                      throw new Error(errorMsg);
+                    }
+                  } catch (listError) {
+                    const errorMsg = `❌ Error checking existing labels on PR #${context.issue.number}: ${listError.message}`;
+                    console.error(errorMsg);
+                    console.error('Error details:', listError);
+                    throw new Error(errorMsg);
+                  }
                 } else {
                   const errorMsg = `❌ Unexpected error adding feature-branch label to PR #${context.issue.number}: ${error.message}`;
                   console.error(errorMsg);
