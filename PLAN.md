@@ -196,6 +196,16 @@ The extraction workflow will create artifacts containing:
 3. **Permission Isolation**: Data collection workflow has read-only permissions
 4. **Existing Security**: All existing validation logic remains in action workflows
 
+### Important Limitations
+
+⚠️ **workflow_run Trigger Limitation**: `workflow_run` triggers only work when both the triggering workflow and the triggered workflow are on the default branch (main). This means:
+
+- **Testing**: Must be done after merging to the default branch
+- **Development**: Feature branch testing requires temporary direct triggers
+- **Deployment**: Full workflow_run chain only functions in production (main branch)
+
+This is a GitHub Actions limitation, not a design flaw in our implementation.
+
 ## Migration Strategy
 
 ### Phase 1: Feature Branch Auto-Labeling

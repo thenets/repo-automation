@@ -28,8 +28,6 @@ name: "Keeper: auto-add triage label"
   workflow_run:
     workflows: ["Keeper: fork trigger"]
     types: [completed]
-  pull_request:
-    types: [synchronize]  # Temporary trigger for testing on feature branch
 
 permissions:
   issues: write
@@ -173,60 +171,4 @@ jobs:
               }
             }
 
-      # TEMPORARY: Test artifact download on feature branch (workflow_run only works on main)
-      - name: Add triage label to pull request (direct trigger - testing)
-        if: github.event_name == 'pull_request' && !github.event.pull_request.draft
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
-          script: |
-            console.log(`🧪 TESTING: Processing PR #${context.issue.number} from direct pull_request trigger`);
-            console.log(`Note: workflow_run triggers only work on default branch, testing artifact-free logic`);
 
-            try {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                labels: ['triage']
-              });
-              console.log(`✅ Successfully added triage label to PR #${context.issue.number}`);
-            } catch (error) {
-              if (error.status === 403) {
-                const errorMsg = `❌ Permission denied: Unable to add 'triage' label to PR #${context.issue.number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
-                console.error(errorMsg);
-                console.error('Error details:', error);
-                throw new Error(errorMsg);
-              } else if (error.status === 422) {
-                // 422 could mean label already exists or label doesn't exist in repo
-                // We need to check which case it is
-                try {
-                  const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: context.issue.number
-                  });
-
-                  const hasTriageLabel = existingLabels.some(label => label.name === 'triage');
-                  if (hasTriageLabel) {
-                    console.log(`ℹ️ Triage label already exists on PR #${context.issue.number} - this is expected behavior`);
-                  } else {
-                    // Label doesn't exist on PR, so 422 means label doesn't exist in repo
-                    const errorMsg = `❌ Failed to add 'triage' label to PR #${context.issue.number}: Label 'triage' does not exist in the repository. Please create the 'triage' label in the repository settings.`;
-                    console.error(errorMsg);
-                    console.error('Error details:', error);
-                    throw new Error(errorMsg);
-                  }
-                } catch (listError) {
-                  const errorMsg = `❌ Error checking existing labels on PR #${context.issue.number}: ${listError.message}`;
-                  console.error(errorMsg);
-                  console.error('Error details:', listError);
-                  throw new Error(errorMsg);
-                }
-              } else {
-                const errorMsg = `❌ Unexpected error adding triage label to PR #${context.issue.number}: ${error.message}`;
-                console.error(errorMsg);
-                console.error('Error details:', error);
-                throw new Error(errorMsg);
-              }
-            }
