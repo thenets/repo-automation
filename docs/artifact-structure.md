@@ -1,6 +1,6 @@
 # PR Metadata Artifact Structure
 
-This document describes the structure of the `pr-metadata.json` artifact created by the `keeper-fork-trigger.yml` workflow.
+This document describes the structure of the `pr-metadata.json` artifact created by the `keeper-trigger.yml` workflow.
 
 ## Purpose
 

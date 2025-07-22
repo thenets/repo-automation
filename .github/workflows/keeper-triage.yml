@@ -31,7 +31,7 @@ name: "Keeper: triage"
   issues:
     types: [opened]
   workflow_run:
-    workflows: ["Keeper: fork trigger"]
+    workflows: ["Keeper: trigger"]
     types: [completed]
 
 permissions:

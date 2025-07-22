@@ -1,5 +1,5 @@
 ---
-# GitHub Repository Automations - Keeper: fork trigger
+# GitHub Repository Automations - Keeper: trigger
 # MIT License - Copyright (c) 2025 Luiz Felipe F M Costa
 # Source: https://github.com/thenets/repo-automations
 #
@@ -13,7 +13,7 @@
 # - Runs on any repository including forks
 # - Single source of truth for PR data
 
-name: "Keeper: fork trigger"
+name: "Keeper: trigger"
 
 on:
   issues:
@@ -151,7 +151,7 @@ jobs:
           ACTION: ${{ github.event.action }}
         run: |
           {
-            echo "🎯 Fork Trigger Workflow Complete"
+            echo "🎯 Trigger Workflow Complete"
             echo "- **PR**: #${PR_NUMBER} - ${PR_TITLE}"
             echo "- **Repository**: ${REPOSITORY}"
             echo "- **Head Repo**: ${HEAD_REPO}"

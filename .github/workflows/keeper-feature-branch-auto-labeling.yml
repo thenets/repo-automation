@@ -23,7 +23,7 @@ name: "Keeper: feature branch auto-labeling from PR description"
 
 'on':
   workflow_run:
-    workflows: ["Keeper: fork trigger"]
+    workflows: ["Keeper: trigger"]
     types: [completed]
 
 permissions:

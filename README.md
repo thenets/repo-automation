@@ -28,7 +28,7 @@ This repository contains GitHub Actions workflows to automate common development
 ├── keeper-closed-pr-label-cleanup.yml     # Removes "ready for review" label from closed PRs
 ├── keeper-feature-branch-auto-labeling.yml # Auto-labels PRs as "feature-branch" based on YAML frontmatter
 ├── keeper-enhanced-triage-management.yml  # Enhanced triage label management with release/ready conditions
-└── keeper-fork-trigger.yml                # Fork-compatible data collection workflow
+└── keeper-trigger.yml                     # Data collection workflow (fork-compatible)
 ```
 
 ## How to use them
@@ -43,7 +43,7 @@ Unified workflow that handles triage labeling, label protection, and ready-for-r
 
 **File**: `.github/workflows/keeper-triage.yml`
 
-**Trigger**: `issues.opened`, `workflow_run` (from `keeper-fork-trigger.yml`)
+**Trigger**: `issues.opened`, `workflow_run` (from `keeper-trigger.yml`)
 
 **Behavior**:
 
@@ -303,7 +303,7 @@ Traditional GitHub Actions workflows fail when triggered by pull requests from f
 
 We implement a **two-workflow pattern** that separates data collection from privileged operations:
 
-1. **Data Collection Workflow** (`keeper-fork-trigger`): Runs on any repository (including forks), collects ALL PR metadata as-is
+1. **Data Collection Workflow** (`keeper-trigger`): Runs on any repository (including forks), collects ALL PR metadata as-is
 2. **Action Workflows** (`keeper-*`): Triggered by data collection completion, run only on target repository with full permissions
 
 ### Workflow Communication Pattern
@@ -312,7 +312,7 @@ We implement a **two-workflow pattern** that separates data collection from priv
 flowchart TD
     A[PR Created/Updated on Fork] --> FT
     
-    subgraph FT ["🔄 keeper-fork-trigger.yml (Runs on Fork)"]
+    subgraph FT ["🔄 keeper-trigger.yml (Runs on Fork)"]
         direction TB
         B[Collect PR Metadata]
         C[Extract: title, body, draft, etc.]
@@ -356,7 +356,7 @@ flowchart TD
 
 | Workflow | Fork Compatible | Status | Notes |
 |----------|-----------------|--------|--------|
-| **keeper-fork-trigger.yml** | ✅ N/A | ✅ Working | Data collection workflow |
+| **keeper-trigger.yml** | ✅ N/A | ✅ Working | Central data collection workflow |
 | **keeper-triage.yml** | ✅ Yes | ✅ Complete | Unified triage management with full artifact consumption |
 | **keeper-auto-label-release-backport.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
 | **keeper-feature-branch-auto-labeling.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |

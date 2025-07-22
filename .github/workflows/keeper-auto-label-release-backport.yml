@@ -24,7 +24,7 @@ name: "Keeper: auto-label release and backport from PR description"
 
 'on':
   workflow_run:
-    workflows: ["Keeper: fork trigger"]
+    workflows: ["Keeper: trigger"]
     types: [completed]
 
 permissions:
