@@ -90,6 +90,19 @@ jobs:
               const acceptedReleases = workflowConfig.accepted_releases;
               const acceptedBackports = workflowConfig.accepted_backports;
 
+              // Create initial check run
+              const checkRun = await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'YAML Validation (Release/Backport)',
+                head_sha: eventData.head_sha,
+                status: 'in_progress',
+                started_at: new Date().toISOString(),
+                details_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              });
+
+              console.log(`📋 Created check run ${checkRun.data.id} for commit ${eventData.head_sha}`);
+
               // Get current labels
               const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
                 owner: context.repo.owner,
@@ -176,7 +189,7 @@ jobs:
                 if (releaseMatch || backportMatch) break;
               }
 
-              // If there are validation errors, post a comment and fail
+              // If there are validation errors, update check run and post comment
               if (validationErrors.length > 0) {
                 const errorComment = '## 🚨 YAML Validation Error\n\n' +
                   validationErrors.map(error => `- ${error}`).join('\n') + '\n\n' +
@@ -190,6 +203,30 @@ jobs:
                   '```\n\n' +
                   `_This comment was posted by the [keeper-auto-label-release-backport workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/keeper-auto-label-release-backport.yml)._`;
 
+                // Update check run with failure
+                await github.rest.checks.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: checkRun.data.id,
+                  status: 'completed',
+                  conclusion: 'failure',
+                  completed_at: new Date().toISOString(),
+                  output: {
+                    title: 'YAML Validation Failed',
+                    summary: `Found ${validationErrors.length} validation error(s) in PR description YAML block.`,
+                    text: validationErrors.map(error => `- ${error}`).join('\n') + '\n\n' +
+                          '**How to fix:**\n' +
+                          '1. Update your PR description YAML block with valid values\n' +
+                          '2. The workflow will automatically re-run when you edit the description\n\n' +
+                          '**Valid YAML format:**\n' +
+                          '```yaml\n' +
+                          `release: 1.5    # Valid releases: ${acceptedReleases.join(', ')}\n` +
+                          `backport: 1.4   # Valid backports: ${acceptedBackports.join(', ')}\n` +
+                          '```'
+                  }
+                });
+
+                // Also post a comment for visibility
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -198,11 +235,29 @@ jobs:
                 });
 
                 console.log('💬 Posted validation error comment to PR');
+                console.log('📋 Updated check run with failure status');
                 throw new Error(validationErrors.join('; '));
               }
 
               if (!yamlFound) {
                 console.log('No valid YAML code blocks found in PR description');
+
+                // Update check run with success (no YAML to validate)
+                await github.rest.checks.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: checkRun.data.id,
+                  status: 'completed',
+                  conclusion: 'success',
+                  completed_at: new Date().toISOString(),
+                  output: {
+                    title: 'No YAML Validation Required',
+                    summary: 'No YAML code blocks found in PR description - validation skipped.',
+                    text: 'This PR does not contain any YAML code blocks that need validation.'
+                  }
+                });
+
+                console.log('📋 Updated check run with success (no YAML found)');
                 return;
               }
 
@@ -220,7 +275,41 @@ jobs:
                     labels: labelsToAdd
                   });
                   console.log(`✅ Successfully added labels: ${labelsToAdd.join(', ')}`);
+
+                  // Update check run with success
+                  await github.rest.checks.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    check_run_id: checkRun.data.id,
+                    status: 'completed',
+                    conclusion: 'success',
+                    completed_at: new Date().toISOString(),
+                    output: {
+                      title: 'YAML Validation Successful',
+                      summary: `Successfully validated YAML and added ${labelsToAdd.length} label(s).`,
+                      text: `**Labels added:**\n${labelsToAdd.map(label => `- \`${label}\``).join('\n')}\n\n` +
+                            '**YAML validation passed** - all values are within accepted ranges.'
+                    }
+                  });
+
+                  console.log('📋 Updated check run with success');
+
                 } catch (error) {
+                  // Update check run with error
+                  await github.rest.checks.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    check_run_id: checkRun.data.id,
+                    status: 'completed',
+                    conclusion: 'failure',
+                    completed_at: new Date().toISOString(),
+                    output: {
+                      title: 'Label Assignment Failed',
+                      summary: 'YAML validation passed but failed to add labels.',
+                      text: `**Error:** ${error.message}\n\n**Attempted to add:** ${labelsToAdd.join(', ')}`
+                    }
+                  });
+
                   if (error.status === 403) {
                     const errorMsg = `❌ Permission denied: Unable to add labels "${labelsToAdd.join(', ')}" to PR #${eventData.issue_number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Issues: Write' and 'Pull requests: Write' permissions.`;
                     console.error(errorMsg);
@@ -244,6 +333,28 @@ jobs:
             } catch (error) {
               // Log the error for debugging
               console.error('🚨 Workflow failed:', error.message);
+
+              // If we have a check run ID in scope, update it with error
+              if (typeof checkRun !== 'undefined') {
+                try {
+                  await github.rest.checks.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    check_run_id: checkRun.data.id,
+                    status: 'completed',
+                    conclusion: 'failure',
+                    completed_at: new Date().toISOString(),
+                    output: {
+                      title: 'Workflow Execution Failed',
+                      summary: 'An unexpected error occurred during workflow execution.',
+                      text: `**Error:** ${error.message}\n\n**Troubleshooting:**\nCheck the workflow logs for detailed error information.`
+                    }
+                  });
+                  console.log('📋 Updated check run with error status');
+                } catch (updateError) {
+                  console.error('Failed to update check run:', updateError.message);
+                }
+              }
 
               // Re-throw to ensure workflow fails
               throw error;
