@@ -90,7 +90,7 @@ Ready for team review."""
         assert release_label_added, f"Release label was not added to PR #{pr_number}"
 
         # Manually remove triage label to simulate condition for ready for review
-        integration_manager.remove_label_from_pr(repo_path, pr_number, "triage")
+        integration_manager.remove_labels_from_pr(repo_path, pr_number, ["triage"])
 
         # Wait for ready for review label to be added
         ready_for_review_label_added = integration_manager.poll_until_condition(
@@ -265,7 +265,7 @@ No YAML block here, so no release label will be added."""
         assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
 
         # Remove triage label to simulate one condition being met
-        integration_manager.remove_label_from_pr(repo_path, pr_number, "triage")
+        integration_manager.remove_labels_from_pr(repo_path, pr_number, ["triage"])
 
         # Wait and verify ready for review label was NOT added
         time.sleep(30)
