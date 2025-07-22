@@ -243,6 +243,35 @@ jobs:
               if (!yamlFound) {
                 console.log('No valid YAML code blocks found in PR description');
 
+                // Delete any previous validation error comments when no YAML is found (also successful)
+                try {
+                  const { data: comments } = await github.rest.issues.listComments({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: eventData.issue_number
+                  });
+
+                  const workflowComments = comments.filter(comment =>
+                    comment.body.includes('🚨 YAML Validation Error') &&
+                    comment.body.includes('keeper-auto-label-release-backport workflow')
+                  );
+
+                  for (const comment of workflowComments) {
+                    await github.rest.issues.deleteComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      comment_id: comment.id
+                    });
+                    console.log(`🗑️ Deleted previous validation error comment ${comment.id}`);
+                  }
+
+                  if (workflowComments.length > 0) {
+                    console.log(`✨ Cleaned up ${workflowComments.length} previous validation error comment(s)`);
+                  }
+                } catch (commentError) {
+                  console.log('ℹ️ Could not clean up previous comments (this is non-critical):', commentError.message);
+                }
+
                 // Update check run with success (no YAML to validate)
                 await github.rest.checks.update({
                   owner: context.repo.owner,
@@ -276,6 +305,35 @@ jobs:
                     labels: labelsToAdd
                   });
                   console.log(`✅ Successfully added labels: ${labelsToAdd.join(', ')}`);
+
+                  // Delete any previous validation error comments when validation passes
+                  try {
+                    const { data: comments } = await github.rest.issues.listComments({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: eventData.issue_number
+                    });
+
+                    const workflowComments = comments.filter(comment =>
+                      comment.body.includes('🚨 YAML Validation Error') &&
+                      comment.body.includes('keeper-auto-label-release-backport workflow')
+                    );
+
+                    for (const comment of workflowComments) {
+                      await github.rest.issues.deleteComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        comment_id: comment.id
+                      });
+                      console.log(`🗑️ Deleted previous validation error comment ${comment.id}`);
+                    }
+
+                    if (workflowComments.length > 0) {
+                      console.log(`✨ Cleaned up ${workflowComments.length} previous validation error comment(s)`);
+                    }
+                  } catch (commentError) {
+                    console.log('ℹ️ Could not clean up previous comments (this is non-critical):', commentError.message);
+                  }
 
                   // Update check run with success
                   await github.rest.checks.update({
