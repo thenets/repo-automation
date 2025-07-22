@@ -580,8 +580,8 @@ The YAML above is malformed and should be ignored."""
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    def test_invalid_tag_values_workflow_fails(self, test_repo, integration_manager):
-        """Test that PR with invalid release/backport values causes workflow to fail.
+    def test_validation_error_comment_lifecycle(self, test_repo, integration_manager):
+        """Test the complete lifecycle of validation error comments: creation and auto-removal.
 
         Steps:
         1. Create a new branch
@@ -589,45 +589,48 @@ The YAML above is malformed and should be ignored."""
         3. Commit and push changes
         4. Create PR with YAML code block containing invalid tag values
         5. Wait for triage label (should still be added by separate workflow)
-        6. Verify the release/backport labeler workflow fails (no release/backport labels added)
-        7. Cleanup PR
+        6. Verify the validation error comment is posted to the PR
+        7. Change the PR description to add valid YAML code block
+        8. Validate the comment will be removed
+        9. Cleanup PR
 
-        Note: This test verifies that invalid values cause the workflow to fail and no labels are added.
-        The failure is expected behavior and indicates proper validation.
+        Note: This test verifies that invalid values cause the workflow to post
+        a validation error comment explaining what went wrong and how to fix it,
+        and that the comment is automatically removed when the YAML is corrected.
         """
         repo_path = test_repo
 
         # Create a new branch
-        branch_name = f"test-invalid-tags-fail-{int(time.time())}"
+        branch_name = f"test-validation-comment-lifecycle-{int(time.time())}"
         integration_manager.create_branch(repo_path, branch_name)
 
         # Create a simple file change
-        test_file = repo_path / "test_invalid_tags.md"
-        content = """# Test File - Invalid Tags
+        test_file = repo_path / "test_validation_lifecycle.md"
+        content = """# Test File - Validation Comment Lifecycle
 
-This file contains changes to test invalid tag value handling.
+This file contains changes to test the complete lifecycle of validation error comments.
 """
         test_file.write_text(content)
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file with invalid tag values", ["test_invalid_tags.md"]
+            repo_path, "Add test file for validation comment lifecycle", ["test_validation_lifecycle.md"]
         )
         integration_manager.push_branch(repo_path, branch_name)
 
         # Create PR with YAML code block containing invalid tag values
-        pr_body = """This PR tests that invalid release/backport tag values cause workflow failure.
+        pr_body = """This PR tests the complete lifecycle of validation error comments.
 
 ```yaml
 release: 99.99  # Invalid release version not in accepted list
 backport: invalid-branch  # Invalid backport target not in accepted list
 ```
 
-The tags above are not in the accepted lists and should cause the workflow to fail."""
+The tags above are not in the accepted lists and should create a validation error comment."""
 
         pr_number = integration_manager.create_pr(
             repo_path,
-            "Test PR with invalid tag values (should fail)",
+            "Test validation error comment lifecycle (create + auto-remove)",
             pr_body,
             branch_name,
         )
@@ -641,28 +644,78 @@ The tags above are not in the accepted lists and should cause the workflow to fa
 
         assert triage_label_added, f"Triage label was not added to PR #{pr_number}"
 
-        # Wait for release/backport workflow to process and fail
-        time.sleep(10)  # Allow more time for workflow to complete/fail
+        # Wait for validation error comment to be posted
+        validation_comment_posted = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_comment_containing(
+                repo_path, pr_number, "🚨 YAML Validation Error"
+            ),
+            timeout=120,
+            poll_interval=10,
+        )
 
-        # Verify no release/backport labels are present (workflow should have failed)
+        assert validation_comment_posted, f"Validation error comment was not posted to PR #{pr_number}"
+
+        # Verify no release/backport labels are present (validation failed)
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
         release_labels = [label for label in labels if label.startswith("release")]
         backport_labels = [label for label in labels if label.startswith("backport")]
 
         assert len(release_labels) == 0, (
-            f"No release labels should be present due to workflow failure, but found: {release_labels}"
+            f"No release labels should be present due to validation failure, but found: {release_labels}"
         )
         assert len(backport_labels) == 0, (
-            f"No backport labels should be present due to workflow failure, but found: {backport_labels}"
+            f"No backport labels should be present due to validation failure, but found: {backport_labels}"
         )
 
-        # Specifically verify the invalid labels are not present
-        assert "release 99.99" not in labels, (
-            f"Invalid 'release 99.99' label should not be present"
+        # Verify the specific invalid values mentioned in the comment
+        comments = integration_manager.get_pr_comments(repo_path, pr_number)
+        error_comment = None
+        for comment in comments:
+            if "🚨 YAML Validation Error" in comment.get("body", ""):
+                error_comment = comment.get("body", "")
+                break
+
+        assert error_comment is not None, "Could not find the validation error comment"
+        assert "Invalid release value: \"99.99\"" in error_comment, "Error comment should mention invalid release value"
+        assert "Invalid backport value: \"invalid-branch\"" in error_comment, "Error comment should mention invalid backport value"
+        assert "How to fix:" in error_comment, "Error comment should provide fix instructions"
+        assert "Valid YAML format:" in error_comment, "Error comment should provide example YAML"
+
+        # Step 7: Update PR description with valid YAML
+        valid_pr_body = """This PR tests that validation error comments are auto-deleted when YAML is fixed.
+
+```yaml
+release: 1.5  # Valid release version
+backport: 1.4  # Valid backport target
+```
+
+The tags above are now valid and should cause the error comment to be automatically deleted."""
+
+        # Update the PR description
+        subprocess.run(
+            ["gh", "pr", "edit", pr_number, "--body", valid_pr_body],
+            cwd=repo_path,
+            check=True,
         )
-        assert "backport invalid-branch" not in labels, (
-            f"Invalid 'backport invalid-branch' label should not be present"
+
+        # Step 8: Wait for validation error comment to be removed
+        comment_removed = integration_manager.poll_until_condition(
+            lambda: not integration_manager.pr_has_comment_containing(
+                repo_path, pr_number, "🚨 YAML Validation Error"
+            ),
+            timeout=120,
+            poll_interval=10,
         )
+
+        assert comment_removed, f"Validation error comment was not automatically removed from PR #{pr_number}"
+
+        # Verify that valid labels were added
+        final_labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        final_release_labels = [label for label in final_labels if label.startswith("release")]
+        final_backport_labels = [label for label in final_labels if label.startswith("backport")]
+
+        assert "release 1.5" in final_labels, f"Expected 'release 1.5' label to be added, but found: {final_labels}"
+        assert "backport 1.4" in final_labels, f"Expected 'backport 1.4' label to be added, but found: {final_labels}"
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)

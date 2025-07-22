@@ -391,6 +391,27 @@ class GitHubTestManager:
         except subprocess.CalledProcessError:
             return False
 
+    def get_pr_comments(self, repo_path: Path, pr_number: str) -> List[Dict]:
+        """Get all comments for a PR."""
+        try:
+            result = subprocess.run(
+                ["gh", "pr", "view", pr_number, "--json", "comments"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            
+            data = json.loads(result.stdout)
+            return data.get("comments", [])
+        except (subprocess.CalledProcessError, json.JSONDecodeError):
+            return []
+
+    def pr_has_comment_containing(self, repo_path: Path, pr_number: str, text: str) -> bool:
+        """Check if a PR has any comment containing the specified text."""
+        comments = self.get_pr_comments(repo_path, pr_number)
+        return any(text in comment.get("body", "") for comment in comments)
+
     def mark_pr_ready_for_review(self, repo_path: Path, pr_number: str) -> bool:
         """Mark a draft PR as ready for review."""
         try:
