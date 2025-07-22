@@ -94,7 +94,8 @@ jobs:
               const backportMatch = yamlContent.match(/^backport:\s*(.+)$/m);
 
               if (releaseMatch) {
-                const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim();
+                const releaseValue = releaseMatch[1].trim().replace(/#.*$/, '').trim()
+                  .replace(/^["']|["']$/g, ''); // Remove surrounding single or double quotes
                 if (releaseValue === '') {
                   // Empty value - skip gracefully
                   console.log('Empty release value found, skipping');
@@ -115,7 +116,8 @@ jobs:
               }
 
               if (backportMatch) {
-                const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim();
+                const backportValue = backportMatch[1].trim().replace(/#.*$/, '').trim()
+                  .replace(/^["']|["']$/g, ''); // Remove surrounding single or double quotes
                 if (backportValue === '') {
                   // Empty value - skip gracefully
                   console.log('Empty backport value found, skipping');

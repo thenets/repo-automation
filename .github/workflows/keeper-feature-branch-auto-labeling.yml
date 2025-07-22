@@ -83,7 +83,9 @@ jobs:
               const featureBranchMatch = yamlContent.match(/^needs_feature_branch:\s*(.+)$/m);
 
               if (featureBranchMatch) {
-                const featureBranchValue = featureBranchMatch[1].trim().replace(/#.*$/, '').trim();
+                const featureBranchValue = featureBranchMatch[1].trim().replace(/#.*$/, '').trim()
+                  .replace(/^["']|["']$/g, '') // Remove surrounding single or double quotes
+                  .toLowerCase(); // Convert to lowercase for case-insensitive comparison
                 console.log(`Found needs_feature_branch value: "${featureBranchValue}"`);
 
                 if (featureBranchValue === '') {
@@ -100,7 +102,7 @@ jobs:
                   yamlFound = true;
                 } else {
                   // Invalid value - fail the workflow
-                  const errorMsg = `❌ Invalid needs_feature_branch value: "${featureBranchValue}". Accepted values: true, false`;
+                  const errorMsg = `❌ Invalid needs_feature_branch value: "${featureBranchValue}". Accepted values: true, false (case-insensitive, with optional quotes)`;
                   console.error(errorMsg);
                   throw new Error(errorMsg);
                 }
