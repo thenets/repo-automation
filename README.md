@@ -30,6 +30,7 @@ This repository contains GitHub Actions workflows to automate common development
 ├── keeper-auto-label-release-backport.yml # Auto-labels PRs based on YAML frontmatter
 ├── keeper-closed-pr-label-cleanup.yml     # Removes "ready for review" label from closed PRs
 ├── keeper-feature-branch-auto-labeling.yml # Auto-labels PRs as "feature-branch" based on YAML frontmatter
+├── keeper-ready-for-review-labeling.yml   # Auto-adds "ready for review" label to PRs with release labels
 ├── keeper-enhanced-triage-management.yml  # Enhanced triage label management with release/ready conditions
 └── keeper-fork-trigger.yml                # Fork-compatible data collection workflow
 ```
