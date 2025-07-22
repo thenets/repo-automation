@@ -18,3 +18,11 @@ This file contains random data, used for PR testing.
 Testing the complete workflow chain:
 1. Fork trigger collects PR metadata
 2. Triage workflow downloads artifact and applies label
+## Testing Fork Trigger Pattern on Main Branch ✅
+
+Now that we're on the main branch, the workflow_run triggers should work properly.
+This change will trigger:
+1. keeper-fork-trigger.yml (collects PR metadata)
+2. keeper-auto-add-triage-label.yml (triggered by workflow_run)
+
+Expected result: Triage label added via the complete fork-compatible workflow chain.
