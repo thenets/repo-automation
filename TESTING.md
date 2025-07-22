@@ -18,3 +18,8 @@ This file contains random data, used for PR testing.
 Testing the complete workflow chain:
 1. Fork trigger collects PR metadata
 2. Triage workflow downloads artifact and applies label
+
+
+## Test Stale Fresh 1753180505
+
+This tests stale PR detection on a fresh PR.
