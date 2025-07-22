@@ -36,11 +36,6 @@ jobs:
 
     if: github.event.workflow_run.conclusion == 'success'
 
-    env:
-      # Define accepted release and backport values
-      ACCEPTED_RELEASES: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2", "devel"]'
-      ACCEPTED_BACKPORTS: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2"]'
-
     steps:
       - name: Download event metadata
         uses: actions/download-artifact@v4
@@ -65,9 +60,10 @@ jobs:
               return;
             }
 
-            // Get accepted values from environment variables
-            const acceptedReleases = JSON.parse(process.env.ACCEPTED_RELEASES);
-            const acceptedBackports = JSON.parse(process.env.ACCEPTED_BACKPORTS);
+            // Get accepted values from configuration artifact
+            const config = JSON.parse(fs.readFileSync('workflow-config.json', 'utf8'));
+            const acceptedReleases = config.accepted_releases;
+            const acceptedBackports = config.accepted_backports;
             console.log(`Accepted releases: ${acceptedReleases.join(', ')}`);
             console.log(`Accepted backports: ${acceptedBackports.join(', ')}`);
 

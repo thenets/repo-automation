@@ -34,6 +34,11 @@ jobs:
     # this is used to prevent the workflow from running on other repos/forks
     if: github.repository == 'thenets/repo-automations'
 
+    env:
+      # Define accepted release and backport values
+      ACCEPTED_RELEASES: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2", "devel"]'
+      ACCEPTED_BACKPORTS: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2"]'
+
     steps:
       - name: Collect event metadata
         uses: actions/github-script@v7
@@ -119,11 +124,21 @@ jobs:
 
             console.log(`✅ Event metadata collected and stored for downstream workflows`);
 
+            // Also store configuration for downstream workflows
+            const config = {
+              accepted_releases: JSON.parse(process.env.ACCEPTED_RELEASES || '[]'),
+              accepted_backports: JSON.parse(process.env.ACCEPTED_BACKPORTS || '[]')
+            };
+            fs.writeFileSync('workflow-config.json', JSON.stringify(config, null, 2));
+            console.log(`📋 Configuration stored: ${config.accepted_releases.length} releases, ${config.accepted_backports.length} backports`);
+
       - name: Upload event metadata artifact
         uses: actions/upload-artifact@v4
         with:
           name: event-metadata
-          path: event-metadata.json
+          path: |
+            event-metadata.json
+            workflow-config.json
           retention-days: 7
 
       - name: Summary
