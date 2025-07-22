@@ -192,7 +192,7 @@ jobs:
 
               // If there are validation errors, update check run and post comment
               if (validationErrors.length > 0) {
-                const errorComment = '## 🚨 YAML Validation Error\n\n' +
+                const errorComment = '## 🚨 YAML Validation Error: release and backport\n\n' +
                   validationErrors.map(error => `- ${error}`).join('\n') + '\n\n' +
                   '### How to fix:\n' +
                   '1. Update your PR description YAML block with valid values\n' +
@@ -252,7 +252,7 @@ jobs:
                   });
 
                   const workflowComments = comments.filter(comment =>
-                    comment.body.includes('🚨 YAML Validation Error') &&
+                    comment.body.includes('🚨 YAML Validation Error: release and backport') &&
                     comment.body.includes('keeper-auto-label-release-backport workflow')
                   );
 
@@ -315,7 +315,7 @@ jobs:
                     });
 
                     const workflowComments = comments.filter(comment =>
-                      comment.body.includes('🚨 YAML Validation Error') &&
+                      comment.body.includes('🚨 YAML Validation Error: release and backport') &&
                       comment.body.includes('keeper-auto-label-release-backport workflow')
                     );
 
