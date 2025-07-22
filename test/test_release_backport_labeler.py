@@ -206,7 +206,9 @@ These changes are for the development branch."""
             ("with_comments", "with hash comments"),
         ],
     )
-    def test_yaml_code_block_edit_description(self, test_repo, integration_manager, yaml_format, test_description):
+    def test_yaml_code_block_edit_description(
+        self, test_repo, integration_manager, yaml_format, test_description
+    ):
         """Test that editing the PR description with a YAML code block updates the labels.
 
         Steps:
@@ -222,7 +224,7 @@ These changes are for the development branch."""
         7. Cleanup PR
         """
         repo_path = test_repo
-        
+
         # Ensure required labels exist
         integration_manager.create_label(
             repo_path, "release 1.0", "00FF00", "Release 1.0"
@@ -245,7 +247,9 @@ This file contains changes to test PR description editing {test_description}.
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, f"Add test file for description editing {test_description}", [f"test_edit_description_{yaml_format}.md"]
+            repo_path,
+            f"Add test file for description editing {test_description}",
+            [f"test_edit_description_{yaml_format}.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -272,11 +276,19 @@ No YAML configuration initially."""
 
         # Verify no release/backport labels initially
         initial_labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        release_labels = [label for label in initial_labels if label.startswith("release")]
-        backport_labels = [label for label in initial_labels if label.startswith("backport")]
-        
-        assert len(release_labels) == 0, f"Expected no release labels initially, got: {release_labels}"
-        assert len(backport_labels) == 0, f"Expected no backport labels initially, got: {backport_labels}"
+        release_labels = [
+            label for label in initial_labels if label.startswith("release")
+        ]
+        backport_labels = [
+            label for label in initial_labels if label.startswith("backport")
+        ]
+
+        assert len(release_labels) == 0, (
+            f"Expected no release labels initially, got: {release_labels}"
+        )
+        assert len(backport_labels) == 0, (
+            f"Expected no backport labels initially, got: {backport_labels}"
+        )
 
         # Prepare the YAML content based on the parameter
         if yaml_format == "clean":
@@ -308,29 +320,40 @@ backport: 1.1#another comment
 
         # Wait for labels to be added
         release_label_added = integration_manager.poll_until_condition(
-            lambda: integration_manager.pr_has_label(repo_path, pr_number, "release 1.0"),
+            lambda: integration_manager.pr_has_label(
+                repo_path, pr_number, "release 1.0"
+            ),
             timeout=120,
             poll_interval=5,
         )
 
         backport_label_added = integration_manager.poll_until_condition(
-            lambda: integration_manager.pr_has_label(repo_path, pr_number, "backport 1.1"),
+            lambda: integration_manager.pr_has_label(
+                repo_path, pr_number, "backport 1.1"
+            ),
             timeout=120,
             poll_interval=5,
         )
 
-        assert release_label_added, f"Release label was not added after description update to PR #{pr_number} ({test_description})"
-        assert backport_label_added, f"Backport label was not added after description update to PR #{pr_number} ({test_description})"
+        assert release_label_added, (
+            f"Release label was not added after description update to PR #{pr_number} ({test_description})"
+        )
+        assert backport_label_added, (
+            f"Backport label was not added after description update to PR #{pr_number} ({test_description})"
+        )
 
         # Verify the labels are present
         updated_labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 1.0" in updated_labels, f"Expected 'release 1.0' label after update ({test_description}), got: {updated_labels}"
-        assert "backport 1.1" in updated_labels, f"Expected 'backport 1.1' label after update ({test_description}), got: {updated_labels}"
+        assert "release 1.0" in updated_labels, (
+            f"Expected 'release 1.0' label after update ({test_description}), got: {updated_labels}"
+        )
+        assert "backport 1.1" in updated_labels, (
+            f"Expected 'backport 1.1' label after update ({test_description}), got: {updated_labels}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    
     def test_release_only_labeling(self, test_repo, integration_manager):
         """Test that PR with only release info gets only release label.
 

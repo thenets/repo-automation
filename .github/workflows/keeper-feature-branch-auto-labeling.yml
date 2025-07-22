@@ -2,6 +2,22 @@
 # GitHub Repository Automations - Keeper: feature branch auto-labeling
 # MIT License - Copyright (c) 2025 Luiz Felipe F M Costa
 # Source: https://github.com/thenets/repo-automations
+#
+# PERMISSIONS REQUIRED FOR FINE-GRAINED PERSONAL ACCESS TOKEN:
+# When using a custom token (CUSTOM_GITHUB_TOKEN secret), the token must have:
+# - Repository access: This repository (or "All repositories" for organization-wide use)
+# - Repository permissions:
+#   - Pull requests: Write (to add labels to pull requests)
+#   - Metadata: Read (to access repository information)
+#
+# SETUP INSTRUCTIONS:
+# 1. Create a fine-grained personal access token at: https://github.com/settings/tokens?type=beta
+# 2. Grant the permissions listed above
+# 3. Add the token as a repository secret named 'CUSTOM_GITHUB_TOKEN'
+# 4. This enables the workflow to run successfully for external contributors
+#
+# NOTE: Without a custom token, the workflow may fail for external contributors
+# due to GitHub's default token permission restrictions.
 
 name: "Keeper: feature branch auto-labeling from PR description"
 
@@ -24,6 +40,7 @@ jobs:
       - name: Parse YAML from PR description and add feature-branch label
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
           script: |
             console.log(`Processing PR #${context.issue.number}`);
 
@@ -43,7 +60,7 @@ jobs:
 
             // Skip if feature-branch label already exists to preserve manual labeling
             if (hasFeatureBranchLabel) {
-              console.log('Feature-branch label already exists, skipping automatic assignment');
+              console.log('ℹ️ Feature-branch label already exists, skipping automatic assignment');
               return;
             }
 
@@ -107,13 +124,20 @@ jobs:
                   issue_number: context.issue.number,
                   labels: ['feature-branch']
                 });
-                console.log('Successfully added feature-branch label');
+                console.log('✅ Successfully added feature-branch label');
               } catch (error) {
-                if (error.status === 422) {
-                  console.log('Feature-branch label may already exist on the PR');
+                if (error.status === 403) {
+                  const errorMsg = `❌ Permission denied: Unable to add 'feature-branch' label to PR #${context.issue.number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
+                  console.error(errorMsg);
+                  console.error('Error details:', error);
+                  throw new Error(errorMsg);
+                } else if (error.status === 422) {
+                  console.log('ℹ️ Feature-branch label may already exist on PR #' + context.issue.number + ' - this is expected behavior');
                 } else {
-                  console.error('Error adding feature-branch label:', error);
-                  throw error;
+                  const errorMsg = `❌ Unexpected error adding feature-branch label to PR #${context.issue.number}: ${error.message}`;
+                  console.error(errorMsg);
+                  console.error('Error details:', error);
+                  throw new Error(errorMsg);
                 }
               }
             }

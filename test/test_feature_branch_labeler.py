@@ -54,7 +54,9 @@ This file contains changes to test feature branch labeling when needs_feature_br
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file for feature branch labeling (true)", ["test_feature_branch_true.md"]
+            repo_path,
+            "Add test file for feature branch labeling (true)",
+            ["test_feature_branch_true.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -87,21 +89,29 @@ This should add the feature-branch label."""
 
         # Wait for feature-branch label to be added
         feature_branch_label_added = integration_manager.poll_until_condition(
-            lambda: integration_manager.pr_has_label(repo_path, pr_number, "feature-branch"),
+            lambda: integration_manager.pr_has_label(
+                repo_path, pr_number, "feature-branch"
+            ),
             timeout=120,
             poll_interval=5,
         )
 
-        assert feature_branch_label_added, f"Feature-branch label was not added to PR #{pr_number}"
+        assert feature_branch_label_added, (
+            f"Feature-branch label was not added to PR #{pr_number}"
+        )
 
         # Verify the label is present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "feature-branch" in labels, f"Expected 'feature-branch' label, but got: {labels}"
+        assert "feature-branch" in labels, (
+            f"Expected 'feature-branch' label, but got: {labels}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    def test_needs_feature_branch_false_no_labeling(self, test_repo, integration_manager):
+    def test_needs_feature_branch_false_no_labeling(
+        self, test_repo, integration_manager
+    ):
         """Test that PR with needs_feature_branch: false does not get feature-branch label.
 
         Steps:
@@ -134,7 +144,9 @@ This file contains changes to test feature branch labeling when needs_feature_br
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file for feature branch labeling (false)", ["test_feature_branch_false.md"]
+            repo_path,
+            "Add test file for feature branch labeling (false)",
+            ["test_feature_branch_false.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -169,13 +181,19 @@ This should NOT add the feature-branch label."""
         time.sleep(30)
 
         # Verify the feature-branch label is NOT present
-        has_feature_branch_label = integration_manager.pr_has_label(repo_path, pr_number, "feature-branch")
-        assert not has_feature_branch_label, f"Feature-branch label should not be added when needs_feature_branch is false for PR #{pr_number}"
+        has_feature_branch_label = integration_manager.pr_has_label(
+            repo_path, pr_number, "feature-branch"
+        )
+        assert not has_feature_branch_label, (
+            f"Feature-branch label should not be added when needs_feature_branch is false for PR #{pr_number}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    def test_no_needs_feature_branch_field_no_labeling(self, test_repo, integration_manager):
+    def test_no_needs_feature_branch_field_no_labeling(
+        self, test_repo, integration_manager
+    ):
         """Test that PR without needs_feature_branch field does not get feature-branch label.
 
         Steps:
@@ -208,7 +226,9 @@ This file contains changes to test feature branch labeling when needs_feature_br
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file for feature branch labeling (no field)", ["test_no_feature_branch_field.md"]
+            repo_path,
+            "Add test file for feature branch labeling (no field)",
+            ["test_no_feature_branch_field.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -242,13 +262,19 @@ This should NOT add the feature-branch label."""
         time.sleep(30)
 
         # Verify the feature-branch label is NOT present
-        has_feature_branch_label = integration_manager.pr_has_label(repo_path, pr_number, "feature-branch")
-        assert not has_feature_branch_label, f"Feature-branch label should not be added when needs_feature_branch field is not present for PR #{pr_number}"
+        has_feature_branch_label = integration_manager.pr_has_label(
+            repo_path, pr_number, "feature-branch"
+        )
+        assert not has_feature_branch_label, (
+            f"Feature-branch label should not be added when needs_feature_branch field is not present for PR #{pr_number}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    def test_invalid_needs_feature_branch_value_failure(self, test_repo, integration_manager):
+    def test_invalid_needs_feature_branch_value_failure(
+        self, test_repo, integration_manager
+    ):
         """Test that PR with invalid needs_feature_branch value causes workflow to fail.
 
         Steps:
@@ -281,7 +307,9 @@ This file contains changes to test feature branch labeling with invalid value.
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file for feature branch labeling (invalid)", ["test_invalid_feature_branch.md"]
+            repo_path,
+            "Add test file for feature branch labeling (invalid)",
+            ["test_invalid_feature_branch.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -316,13 +344,19 @@ This should cause the workflow to fail."""
         time.sleep(30)
 
         # Verify the feature-branch label is NOT present (workflow should fail)
-        has_feature_branch_label = integration_manager.pr_has_label(repo_path, pr_number, "feature-branch")
-        assert not has_feature_branch_label, f"Feature-branch label should not be added when needs_feature_branch has invalid value for PR #{pr_number}"
+        has_feature_branch_label = integration_manager.pr_has_label(
+            repo_path, pr_number, "feature-branch"
+        )
+        assert not has_feature_branch_label, (
+            f"Feature-branch label should not be added when needs_feature_branch has invalid value for PR #{pr_number}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    def test_empty_needs_feature_branch_value_no_labeling(self, test_repo, integration_manager):
+    def test_empty_needs_feature_branch_value_no_labeling(
+        self, test_repo, integration_manager
+    ):
         """Test that PR with empty needs_feature_branch value does not get feature-branch label.
 
         Steps:
@@ -355,7 +389,9 @@ This file contains changes to test feature branch labeling with empty value.
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file for feature branch labeling (empty)", ["test_empty_feature_branch.md"]
+            repo_path,
+            "Add test file for feature branch labeling (empty)",
+            ["test_empty_feature_branch.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -390,13 +426,19 @@ This should NOT add the feature-branch label."""
         time.sleep(30)
 
         # Verify the feature-branch label is NOT present
-        has_feature_branch_label = integration_manager.pr_has_label(repo_path, pr_number, "feature-branch")
-        assert not has_feature_branch_label, f"Feature-branch label should not be added when needs_feature_branch is empty for PR #{pr_number}"
+        has_feature_branch_label = integration_manager.pr_has_label(
+            repo_path, pr_number, "feature-branch"
+        )
+        assert not has_feature_branch_label, (
+            f"Feature-branch label should not be added when needs_feature_branch is empty for PR #{pr_number}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    def test_needs_feature_branch_with_comments_ignored(self, test_repo, integration_manager):
+    def test_needs_feature_branch_with_comments_ignored(
+        self, test_repo, integration_manager
+    ):
         """Test that comments after # in needs_feature_branch value are ignored.
 
         Steps:
@@ -429,7 +471,9 @@ This file contains changes to test feature branch labeling with comments.
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file for feature branch labeling (comments)", ["test_feature_branch_comments.md"]
+            repo_path,
+            "Add test file for feature branch labeling (comments)",
+            ["test_feature_branch_comments.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -462,21 +506,29 @@ The comment should be ignored and feature-branch label should be added."""
 
         # Wait for feature-branch label to be added
         feature_branch_label_added = integration_manager.poll_until_condition(
-            lambda: integration_manager.pr_has_label(repo_path, pr_number, "feature-branch"),
+            lambda: integration_manager.pr_has_label(
+                repo_path, pr_number, "feature-branch"
+            ),
             timeout=120,
             poll_interval=5,
         )
 
-        assert feature_branch_label_added, f"Feature-branch label was not added to PR #{pr_number} (comment should be ignored)"
+        assert feature_branch_label_added, (
+            f"Feature-branch label was not added to PR #{pr_number} (comment should be ignored)"
+        )
 
         # Verify the label is present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "feature-branch" in labels, f"Expected 'feature-branch' label (comment ignored), but got: {labels}"
+        assert "feature-branch" in labels, (
+            f"Expected 'feature-branch' label (comment ignored), but got: {labels}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
-    def test_existing_feature_branch_label_preserved(self, test_repo, integration_manager):
+    def test_existing_feature_branch_label_preserved(
+        self, test_repo, integration_manager
+    ):
         """Test that existing feature-branch label is preserved and not overwritten.
 
         Steps:
@@ -510,7 +562,9 @@ This file contains changes to test preserving existing feature-branch label.
 
         # Commit and push changes
         integration_manager.git_commit_and_push(
-            repo_path, "Add test file for preserving feature branch label", ["test_preserve_feature_branch.md"]
+            repo_path,
+            "Add test file for preserving feature branch label",
+            ["test_preserve_feature_branch.md"],
         )
         integration_manager.push_branch(repo_path, branch_name)
 
@@ -544,12 +598,16 @@ No YAML configuration initially."""
 
         # Verify feature-branch label was added
         feature_branch_label_added = integration_manager.poll_until_condition(
-            lambda: integration_manager.pr_has_label(repo_path, pr_number, "feature-branch"),
+            lambda: integration_manager.pr_has_label(
+                repo_path, pr_number, "feature-branch"
+            ),
             timeout=60,
             poll_interval=3,
         )
 
-        assert feature_branch_label_added, f"Feature-branch label was not manually added to PR #{pr_number}"
+        assert feature_branch_label_added, (
+            f"Feature-branch label was not manually added to PR #{pr_number}"
+        )
 
         # Edit PR to include needs_feature_branch: false
         updated_pr_body = """This PR tests preserving existing feature-branch label.
@@ -572,8 +630,12 @@ The existing feature-branch label should be preserved."""
         time.sleep(30)
 
         # Verify the feature-branch label is still present (preserved)
-        has_feature_branch_label = integration_manager.pr_has_label(repo_path, pr_number, "feature-branch")
-        assert has_feature_branch_label, f"Feature-branch label should be preserved even when needs_feature_branch is false for PR #{pr_number}"
+        has_feature_branch_label = integration_manager.pr_has_label(
+            repo_path, pr_number, "feature-branch"
+        )
+        assert has_feature_branch_label, (
+            f"Feature-branch label should be preserved even when needs_feature_branch is false for PR #{pr_number}"
+        )
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)

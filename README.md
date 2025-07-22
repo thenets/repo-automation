@@ -305,6 +305,41 @@ flowchart LR
    - Graceful failure on permission issues
    - Logging for debugging
 
+## Fine-Grained Token Permissions
+
+### For External Contributors
+
+When external contributors (non-collaborators) create pull requests or issues, the default `GITHUB_TOKEN` has limited permissions and may cause workflows to fail with permission errors. To enable all workflows to function properly for external contributors, repository administrators should create a fine-grained personal access token.
+
+### Required Permissions
+
+**Repository Access:**
+- This repository (or "All repositories" for organization-wide use)
+
+**Repository Permissions:**
+- **Issues: Write** - Required to add labels to issues
+- **Issues: Read** - Required to access issue comments and timeline events
+- **Pull requests: Write** - Required to add labels to pull requests
+- **Pull requests: Read** - Required to list and read pull request details
+- **Metadata: Read** - Required to access repository information
+
+### Setup Instructions
+
+1. **Create Token**: Go to [GitHub Settings > Personal Access Tokens (Beta)](https://github.com/settings/tokens?type=beta)
+2. **Configure Access**: Select the target repository or choose "All repositories" for organization-wide use
+3. **Set Permissions**: Grant all the permissions listed above
+4. **Add to Repository**: Add the token as a repository secret named `CUSTOM_GITHUB_TOKEN`
+   - Go to your repository Settings > Secrets and variables > Actions
+   - Click "New repository secret"
+   - Name: `CUSTOM_GITHUB_TOKEN`
+   - Value: Your generated token
+
+### Workflow Behavior
+
+- **With Custom Token**: All workflows will function properly for external contributors
+- **Without Custom Token**: Workflows may fail for external contributors with clear error messages explaining the setup required
+- **Backward Compatible**: Existing setups continue to work without any changes required
+
 ## Prerequisites
 
 - Repository must have "triage" and "stale" labels created

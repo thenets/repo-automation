@@ -457,7 +457,9 @@ class GitHubFixtures:
 class TestTriageAutoAdd(GitHubFixtures):
     """Integration test cases for the triage auto-add workflow."""
 
-    def test_pr_triage_label_draft_must_be_ignored(self, test_repo, integration_manager):
+    def test_pr_triage_label_draft_must_be_ignored(
+        self, test_repo, integration_manager
+    ):
         """Test that a draft PR does not get the triage label.
 
         Steps:
@@ -500,13 +502,17 @@ class TestTriageAutoAdd(GitHubFixtures):
         time.sleep(30)
 
         # Verify that the triage label is NOT added to the draft PR
-        has_triage_label = integration_manager.pr_has_label(repo_path, pr_number, "triage")
+        has_triage_label = integration_manager.pr_has_label(
+            repo_path, pr_number, "triage"
+        )
         assert not has_triage_label, (
             f"Triage label should not be added to draft PR #{pr_number}"
         )
 
         # Mark PR as ready for review
-        ready_success = integration_manager.mark_pr_ready_for_review(repo_path, pr_number)
+        ready_success = integration_manager.mark_pr_ready_for_review(
+            repo_path, pr_number
+        )
         assert ready_success, f"Failed to mark PR #{pr_number} as ready for review"
 
         # Wait for the GitHub Actions workflow to process the ready for review event
@@ -528,7 +534,6 @@ class TestTriageAutoAdd(GitHubFixtures):
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
-
 
     def test_pr_triage_label_auto_add(self, test_repo, integration_manager):
         """Test that a new PR automatically gets the triage label.
