@@ -454,7 +454,7 @@ When external contributors (non-collaborators) create pull requests or issues, t
 
 ## Prerequisites
 
-- Repository must have "triage" and "stale" labels created
+- Repository must have "triage", "stale", and "ready for review" labels created
 - GitHub Actions must have write permissions for issues and pull requests
 - Workflows require `GITHUB_TOKEN` with appropriate scopes
 
@@ -464,6 +464,7 @@ When external contributors (non-collaborators) create pull requests or issues, t
 2. Ensure required labels exist in repository settings:
    - "triage" (for new issues/PRs)
    - "stale" (for inactive PRs)
+   - "ready for review" (for PRs ready for team review)
 3. Verify GitHub Actions permissions include:
    - `issues: write`
    - `pull-requests: write`
