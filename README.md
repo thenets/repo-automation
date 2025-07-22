@@ -11,7 +11,8 @@ This repository contains GitHub Actions workflows to automate common development
   - [4. Keeper: auto-label release and backport](#4-keeper-auto-label-release-and-backport) ✅ **Implemented**
   - [5. Keeper: closed PR label cleanup](#5-keeper-closed-pr-label-cleanup) 📝 **Planned**
   - [6. Keeper: feature branch auto-labeling](#6-keeper-feature-branch-auto-labeling) ✅ **Implemented**
-  - [7. Keeper: enhanced triage label management](#7-keeper-enhanced-triage-label-management) 📝 **Planned**
+  - [7. Keeper: ready for review labeling](#7-keeper-ready-for-review-labeling) ✅ **Implemented**
+  - [8. Keeper: enhanced triage label management](#8-keeper-enhanced-triage-label-management) 📝 **Planned**
 - [Workflow Structure](#workflow-structure)
 - [Fork Compatibility](#fork-compatibility)
 - [Prerequisites](#prerequisites)
@@ -254,7 +255,43 @@ flowchart LR
     H --> I
 ```
 
-### 7. Keeper: enhanced triage label management
+### 7. Keeper: ready for review labeling
+Automatically adds "ready for review" label to pull requests that have a release label but no triage label.
+
+**File**: `.github/workflows/keeper-ready-for-review-labeling.yml`
+
+**Trigger**: `workflow_run` (triggered by `keeper-fork-trigger.yml`)
+
+**Behavior**:
+- Monitors pull request events from the fork trigger workflow
+- Checks if PR has any label starting with "release " (e.g., "release 1.5", "release main")
+- Verifies that PR does NOT have the "triage" label
+- If both conditions are met, adds "ready for review" label to the PR
+- Skips if "ready for review" label already exists
+- This indicates the PR is properly categorized and ready for team review
+
+**Logic Flow**:
+1. **PR Event Detected** → Check if PR has "release *" label
+2. **Has Release Label** → Check if PR lacks "triage" label  
+3. **No Triage Label** → Add "ready for review" label
+4. **Conditions Not Met** → No action taken
+
+**Integration with Existing Workflows**:
+- **Works with** `keeper-auto-label-release-backport.yml` for release label assignment
+- **Complements** `keeper-triage-label-protection.yml` for complete label lifecycle
+- **Integrates with** `keeper-closed-pr-label-cleanup.yml` for cleanup when PR is closed
+
+```mermaid
+flowchart LR
+    A[PR Event] --> B{Has release label?}
+    B -->|Yes| C{Has triage label?}
+    B -->|No| D[✅ No Action]
+    C -->|No| E[Add ready for review Label]
+    C -->|Yes| F[✅ No Action - Still in Triage]
+    E --> G[✅ Complete]
+```
+
+### 8. Keeper: enhanced triage label management
 Enhances the existing triage label protection by automatically removing the "triage" label when specific conditions are met.
 
 **File**: `.github/workflows/keeper-enhanced-triage-management.yml`
@@ -337,15 +374,21 @@ flowchart TD
         subgraph TR ["keeper-auto-add-triage-label.yml"]
             T1[Download Artifact] --> T2[Check prData.draft] --> T3[Apply triage Label]
         end
+        
+        subgraph RDY ["keeper-ready-for-review-labeling.yml"]
+            R1[Download Artifact] --> R2[Check release & triage labels] --> R3[Apply ready for review Label]
+        end
     end
     
     TG --> FB
     TG --> RB  
     TG --> TR
+    TG --> RDY
     
     FB --> Z[✅ Complete]
     RB --> Z
     TR --> Z
+    RDY --> Z
     
     style A fill:#e1f5fe
     style FT fill:#fff3e0
@@ -361,6 +404,7 @@ flowchart TD
 | **keeper-auto-add-triage-label.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
 | **keeper-auto-label-release-backport.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
 | **keeper-feature-branch-auto-labeling.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
+| **keeper-ready-for-review-labeling.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
 | **keeper-triage-label-protection.yml** | ✅ N/A | ✅ No changes needed | Uses labeled/unlabeled |
 | **keeper-stale-pr-detector.yml** | ✅ N/A | ✅ No changes needed | Uses schedule/dispatch |
 
