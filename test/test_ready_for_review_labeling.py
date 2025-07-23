@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import pytest
-from .test_triage_auto_add import GitHubTestManager, GitHubFixtures
+from .conftest import GitHubTestManager, GitHubFixtures
 
 
 @pytest.mark.integration

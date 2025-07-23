@@ -8,7 +8,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from .test_triage_auto_add import GitHubFixtures
+from .conftest import GitHubFixtures
 
 
 class TestBasicFunctionality(GitHubFixtures):

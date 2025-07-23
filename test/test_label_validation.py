@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from .test_triage_auto_add import GitHubFixtures
+from .conftest import GitHubFixtures
 
 
 @pytest.mark.integration
