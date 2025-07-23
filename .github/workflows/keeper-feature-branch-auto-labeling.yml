@@ -28,6 +28,7 @@ name: "Keeper: feature branch auto-labeling from PR description"
 
 permissions:
   pull-requests: write
+  checks: write
 
 jobs:
   auto-label-feature-branch:
@@ -48,137 +49,377 @@ jobs:
         with:
           github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
           script: |
-            // Load event metadata from artifact
-            const fs = require('fs');
-            const eventData = JSON.parse(fs.readFileSync('event-metadata.json', 'utf8'));
-            console.log(`Processing ${eventData.event_type} #${eventData.issue_number} from workflow_run trigger`);
+            try {
+              console.log(`🔍 Processing PR #${context.issue.number}`);
 
-            // Only process pull request events
-            if (eventData.event_type !== 'pull_request') {
-              console.log(`Event type ${eventData.event_type} is not a pull request, skipping`);
-              return;
-            }
+              // Load event metadata from artifact
+              const fs = require('fs');
+              let eventData;
 
-            // Get existing labels on the PR
-            const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: eventData.issue_number
-            });
-
-            const existingLabelNames = existingLabels.map(label => label.name);
-            console.log(`Existing labels: ${existingLabelNames.join(', ')}`);
-
-            // Check if feature-branch label already exists
-            const hasFeatureBranchLabel = existingLabelNames.includes('feature-branch');
-            console.log(`Has existing feature-branch label: ${hasFeatureBranchLabel}`);
-
-            // Skip if feature-branch label already exists to preserve manual labeling
-            if (hasFeatureBranchLabel) {
-              console.log('ℹ️ Feature-branch label already exists, skipping automatic assignment');
-              return;
-            }
-
-            // Get PR description from artifact
-            const prBody = eventData.body || '';
-            console.log(`PR description:\n${prBody}`);
-
-            let yamlFound = false;
-            let shouldAddFeatureBranchLabel = false;
-
-            // Look for YAML code blocks in the PR description
-            const yamlBlockRegex = /```yaml\s*\n([\s\S]*?)\n\s*```/g;
-            let match;
-
-            while ((match = yamlBlockRegex.exec(prBody)) !== null) {
-              const yamlContent = match[1];
-              console.log(`Found YAML block:\n${yamlContent}`);
-
-              // Parse needs_feature_branch value
-              const featureBranchMatch = yamlContent.match(/^needs_feature_branch:\s*(.+)$/m);
-
-              if (featureBranchMatch) {
-                const featureBranchValue = featureBranchMatch[1].trim().replace(/#.*$/, '').trim()
-                  .replace(/^["']|["']$/g, '') // Remove surrounding single or double quotes
-                  .toLowerCase(); // Convert to lowercase for case-insensitive comparison
-                console.log(`Found needs_feature_branch value: "${featureBranchValue}"`);
-
-                if (featureBranchValue === '') {
-                  // Empty value - skip gracefully
-                  console.log('Empty needs_feature_branch value found, skipping');
-                } else if (featureBranchValue === 'true') {
-                  // Valid true value - add feature-branch label
-                  shouldAddFeatureBranchLabel = true;
-                  console.log('needs_feature_branch is true, will add feature-branch label');
-                  yamlFound = true;
-                } else if (featureBranchValue === 'false') {
-                  // Valid false value - no action needed
-                  console.log('needs_feature_branch is false, no label will be added');
-                  yamlFound = true;
-                } else {
-                  // Invalid value - fail the workflow
-                  const errorMsg = `❌ Invalid needs_feature_branch value: "${featureBranchValue}". Accepted values: true, false (case-insensitive, with optional quotes)`;
-                  console.error(errorMsg);
-                  throw new Error(errorMsg);
-                }
-
-                // Stop after finding the first YAML block with needs_feature_branch
-                break;
-              }
-            }
-
-            if (!yamlFound) {
-              console.log('No needs_feature_branch field found in YAML code blocks');
-              return;
-            }
-
-            // Add feature-branch label if needed
-            if (shouldAddFeatureBranchLabel) {
               try {
-                await github.rest.issues.addLabels({
+                const eventMetadata = fs.readFileSync('event-metadata.json', 'utf8');
+                eventData = JSON.parse(eventMetadata);
+                console.log(`📥 Event data loaded: ${eventData.event_type} for #${eventData.issue_number}`);
+              } catch (error) {
+                console.log('❌ No event metadata found, exiting gracefully');
+                return;
+              }
+
+              // Only process pull request events
+              if (eventData.event_type !== 'pull_request') {
+                console.log(`Event type ${eventData.event_type} is not a pull request, skipping`);
+                return;
+              }
+
+              // Create initial check run
+              const checkRun = await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'YAML Validation (Feature Branch)',
+                head_sha: eventData.head_sha,
+                status: 'in_progress',
+                started_at: new Date().toISOString(),
+                details_url: `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              });
+
+              console.log(`📋 Created check run ${checkRun.data.id} for commit ${eventData.head_sha}`);
+
+              // Get existing labels on the PR
+              const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: eventData.issue_number
+              });
+
+              const existingLabelNames = existingLabels.map(label => label.name);
+              console.log(`Existing labels: ${existingLabelNames.join(', ')}`);
+
+              // Check if feature-branch label already exists
+              const hasFeatureBranchLabel = existingLabelNames.includes('feature-branch');
+              console.log(`Has existing feature-branch label: ${hasFeatureBranchLabel}`);
+
+              // Skip if feature-branch label already exists to preserve manual labeling
+              if (hasFeatureBranchLabel) {
+                console.log('ℹ️ Feature-branch label already exists, skipping automatic assignment');
+
+                // Delete any previous validation error comments when label already exists
+                await cleanupPreviousErrorComments(eventData.issue_number);
+
+                // Update check run with success (no action needed)
+                await github.rest.checks.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: checkRun.data.id,
+                  status: 'completed',
+                  conclusion: 'success',
+                  completed_at: new Date().toISOString(),
+                  output: {
+                    title: 'Feature Branch Label Already Present',
+                    summary: 'Feature-branch label already exists on this PR - skipping automatic assignment.',
+                    text: 'This PR already has the feature-branch label. Automatic assignment is skipped to preserve manual labeling.'
+                  }
+                });
+
+                console.log('📋 Updated check run with success (label already exists)');
+                return;
+              }
+
+              // Get PR description from artifact
+              const prBody = eventData.body || '';
+              console.log(`PR description:\n${prBody}`);
+
+              let yamlFound = false;
+              let shouldAddFeatureBranchLabel = false;
+              const validationErrors = [];
+
+              // Look for YAML code blocks in the PR description
+              const yamlBlockRegex = /```yaml\s*\n([\s\S]*?)\n\s*```/g;
+              let match;
+
+              while ((match = yamlBlockRegex.exec(prBody)) !== null) {
+                const yamlContent = match[1];
+                console.log(`Found YAML block:\n${yamlContent}`);
+
+                // Parse needs_feature_branch value
+                const featureBranchMatch = yamlContent.match(/^needs_feature_branch:\s*(.+)$/m);
+
+                if (featureBranchMatch) {
+                  const featureBranchValue = featureBranchMatch[1].trim().replace(/#.*$/, '').trim()
+                    .replace(/^["']|["']$/g, '') // Remove surrounding single or double quotes
+                    .toLowerCase(); // Convert to lowercase for case-insensitive comparison
+                  console.log(`Found needs_feature_branch value: "${featureBranchValue}"`);
+
+                  if (featureBranchValue === '') {
+                    // Empty value - skip gracefully
+                    console.log('Empty needs_feature_branch value found, skipping');
+                    yamlFound = true;
+                  } else if (featureBranchValue === 'true') {
+                    // Valid true value - add feature-branch label
+                    shouldAddFeatureBranchLabel = true;
+                    console.log('needs_feature_branch is true, will add feature-branch label');
+                    yamlFound = true;
+                  } else if (featureBranchValue === 'false') {
+                    // Valid false value - no action needed
+                    console.log('needs_feature_branch is false, no label will be added');
+                    yamlFound = true;
+                  } else {
+                    // Invalid value - collect error
+                    const errorMsg = `❌ Invalid needs_feature_branch value: "${featureBranchValue}". Accepted values: true, false (case-insensitive, with optional quotes)`;
+                    console.error(errorMsg);
+                    validationErrors.push(errorMsg);
+                    yamlFound = true;
+                  }
+
+                  // Stop after finding the first YAML block with needs_feature_branch
+                  break;
+                }
+              }
+
+              // If there are validation errors, update check run and post comment
+              if (validationErrors.length > 0) {
+                const errorComment = '## 🚨 YAML Validation Error: feature branch\n\n' +
+                  validationErrors.map(error => `- ${error}`).join('\n') + '\n\n' +
+                  '### How to fix:\n' +
+                  '1. Update your PR description YAML block with valid values\n' +
+                  '2. The workflow will automatically re-run when you edit the description\n\n' +
+                  '### Valid YAML format:\n' +
+                  '```yaml\n' +
+                  'needs_feature_branch: true    # Valid values: true, false (case-insensitive)\n' +
+                  'needs_feature_branch: false   # Quotes are optional: "true", \'false\', etc.\n' +
+                  '```\n\n' +
+                  `_This comment was posted by the [keeper-feature-branch-auto-labeling workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/keeper-feature-branch-auto-labeling.yml)._`;
+
+                // Update check run with failure
+                await github.rest.checks.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: checkRun.data.id,
+                  status: 'completed',
+                  conclusion: 'failure',
+                  completed_at: new Date().toISOString(),
+                  output: {
+                    title: 'YAML Validation Failed',
+                    summary: `Found ${validationErrors.length} validation error(s) in PR description YAML block.`,
+                    text: validationErrors.map(error => `- ${error}`).join('\n') + '\n\n' +
+                          '**How to fix:**\n' +
+                          '1. Update your PR description YAML block with valid values\n' +
+                          '2. The workflow will automatically re-run when you edit the description\n\n' +
+                          '**Valid YAML format:**\n' +
+                          '```yaml\n' +
+                          'needs_feature_branch: true    # Valid values: true, false (case-insensitive)\n' +
+                          'needs_feature_branch: false   # Quotes are optional: "true", \'false\', etc.\n' +
+                          '```'
+                  }
+                });
+
+                // Also post a comment for visibility
+                await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: eventData.issue_number,
-                  labels: ['feature-branch']
+                  body: errorComment
                 });
-                console.log('✅ Successfully added feature-branch label');
-              } catch (error) {
-                if (error.status === 403) {
-                  const errorMsg = `❌ Permission denied: Unable to add 'feature-branch' label to PR #${eventData.issue_number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
-                  console.error(errorMsg);
-                  console.error('Error details:', error);
-                  throw new Error(errorMsg);
-                } else if (error.status === 422) {
-                  // 422 could mean label already exists or label doesn't exist in repo
-                  // We need to check which case it is
-                  try {
-                    const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      issue_number: eventData.issue_number
-                    });
 
-                    const hasFeatureBranchLabel = existingLabels.some(label => label.name === 'feature-branch');
-                    if (hasFeatureBranchLabel) {
-                      console.log('ℹ️ Feature-branch label already exists on PR #' + eventData.issue_number + ' - this is expected behavior');
-                    } else {
-                      // Label doesn't exist on PR, so 422 means label doesn't exist in repo
-                      const errorMsg = `❌ Failed to add 'feature-branch' label to PR #${eventData.issue_number}: Label 'feature-branch' does not exist in the repository. Please create the 'feature-branch' label in the repository settings.`;
+                console.log('💬 Posted validation error comment to PR');
+                console.log('📋 Updated check run with failure status');
+                throw new Error(validationErrors.join('; '));
+              }
+
+              if (!yamlFound) {
+                console.log('No needs_feature_branch field found in YAML code blocks');
+
+                // Delete any previous validation error comments when no YAML is found
+                await cleanupPreviousErrorComments(eventData.issue_number);
+
+                // Update check run with success (no YAML to validate)
+                await github.rest.checks.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: checkRun.data.id,
+                  status: 'completed',
+                  conclusion: 'success',
+                  completed_at: new Date().toISOString(),
+                  output: {
+                    title: 'No YAML Validation Required',
+                    summary: 'No needs_feature_branch field found in YAML code blocks - validation skipped.',
+                    text: 'This PR does not contain any needs_feature_branch field that needs validation.'
+                  }
+                });
+
+                console.log('📋 Updated check run with success (no YAML found)');
+                return;
+              }
+
+              // Add feature-branch label if needed
+              if (shouldAddFeatureBranchLabel) {
+                try {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: eventData.issue_number,
+                    labels: ['feature-branch']
+                  });
+                  console.log('✅ Successfully added feature-branch label');
+
+                  // Delete any previous validation error comments when validation passes
+                  await cleanupPreviousErrorComments(eventData.issue_number);
+
+                  // Update check run with success
+                  await github.rest.checks.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    check_run_id: checkRun.data.id,
+                    status: 'completed',
+                    conclusion: 'success',
+                    completed_at: new Date().toISOString(),
+                    output: {
+                      title: 'YAML Validation Successful',
+                      summary: 'Successfully validated YAML and added feature-branch label.',
+                      text: '**Label added:**\n- `feature-branch`\n\n' +
+                            '**YAML validation passed** - needs_feature_branch value is valid.'
+                    }
+                  });
+
+                  console.log('📋 Updated check run with success');
+
+                } catch (error) {
+                  // Update check run with error
+                  await github.rest.checks.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    check_run_id: checkRun.data.id,
+                    status: 'completed',
+                    conclusion: 'failure',
+                    completed_at: new Date().toISOString(),
+                    output: {
+                      title: 'Label Assignment Failed',
+                      summary: 'YAML validation passed but failed to add feature-branch label.',
+                      text: `**Error:** ${error.message}\n\n**Attempted to add:** feature-branch`
+                    }
+                  });
+
+                  if (error.status === 403) {
+                    const errorMsg = `❌ Permission denied: Unable to add 'feature-branch' label to PR #${eventData.issue_number}. This typically happens when the workflow is triggered by an external contributor and the repository doesn't have a CUSTOM_GITHUB_TOKEN secret configured with appropriate permissions. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with 'Pull requests: Write' permission.`;
+                    console.error(errorMsg);
+                    console.error('Error details:', error);
+                    throw new Error(errorMsg);
+                  } else if (error.status === 422) {
+                    // 422 could mean label already exists or label doesn't exist in repo
+                    // We need to check which case it is
+                    try {
+                      const { data: existingLabels } = await github.rest.issues.listLabelsOnIssue({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        issue_number: eventData.issue_number
+                      });
+
+                      const hasFeatureBranchLabel = existingLabels.some(label => label.name === 'feature-branch');
+                      if (hasFeatureBranchLabel) {
+                        console.log('ℹ️ Feature-branch label already exists on PR #' + eventData.issue_number + ' - this is expected behavior');
+                      } else {
+                        // Label doesn't exist on PR, so 422 means label doesn't exist in repo
+                        const errorMsg = `❌ Failed to add 'feature-branch' label to PR #${eventData.issue_number}: Label 'feature-branch' does not exist in the repository. Please create the 'feature-branch' label in the repository settings.`;
+                        console.error(errorMsg);
+                        console.error('Error details:', error);
+                        throw new Error(errorMsg);
+                      }
+                    } catch (listError) {
+                      const errorMsg = `❌ Error checking existing labels on PR #${eventData.issue_number}: ${listError.message}`;
                       console.error(errorMsg);
-                      console.error('Error details:', error);
+                      console.error('Error details:', listError);
                       throw new Error(errorMsg);
                     }
-                  } catch (listError) {
-                    const errorMsg = `❌ Error checking existing labels on PR #${eventData.issue_number}: ${listError.message}`;
+                  } else {
+                    const errorMsg = `❌ Unexpected error adding feature-branch label to PR #${eventData.issue_number}: ${error.message}`;
                     console.error(errorMsg);
-                    console.error('Error details:', listError);
+                    console.error('Error details:', error);
                     throw new Error(errorMsg);
                   }
-                } else {
-                  const errorMsg = `❌ Unexpected error adding feature-branch label to PR #${eventData.issue_number}: ${error.message}`;
-                  console.error(errorMsg);
-                  console.error('Error details:', error);
-                  throw new Error(errorMsg);
+                }
+              } else {
+                // needs_feature_branch was false or empty - no label to add
+                console.log('✅ No feature-branch label needed based on YAML configuration');
+
+                // Delete any previous validation error comments when validation passes
+                await cleanupPreviousErrorComments(eventData.issue_number);
+
+                // Update check run with success
+                await github.rest.checks.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  check_run_id: checkRun.data.id,
+                  status: 'completed',
+                  conclusion: 'success',
+                  completed_at: new Date().toISOString(),
+                  output: {
+                    title: 'YAML Validation Successful',
+                    summary: 'Successfully validated YAML - no feature-branch label needed.',
+                    text: '**YAML validation passed** - needs_feature_branch is false or empty, no label added.'
+                  }
+                });
+
+                console.log('📋 Updated check run with success (no label needed)');
+              }
+
+              // Helper function to clean up previous error comments
+              async function cleanupPreviousErrorComments(issueNumber) {
+                try {
+                  const { data: comments } = await github.rest.issues.listComments({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber
+                  });
+
+                  const workflowComments = comments.filter(comment =>
+                    comment.body.includes('🚨 YAML Validation Error: feature branch') &&
+                    comment.body.includes('keeper-feature-branch-auto-labeling workflow')
+                  );
+
+                  for (const comment of workflowComments) {
+                    await github.rest.issues.deleteComment({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      comment_id: comment.id
+                    });
+                    console.log(`🗑️ Deleted previous validation error comment ${comment.id}`);
+                  }
+
+                  if (workflowComments.length > 0) {
+                    console.log(`✨ Cleaned up ${workflowComments.length} previous validation error comment(s)`);
+                  }
+                } catch (commentError) {
+                  console.log('ℹ️ Could not clean up previous comments (this is non-critical):', commentError.message);
                 }
               }
+
+              console.log('🎉 Feature branch labeling completed successfully');
+
+            } catch (error) {
+              // Log the error for debugging
+              console.error('🚨 Workflow failed:', error.message);
+
+              // If we have a check run ID in scope, update it with error
+              if (typeof checkRun !== 'undefined') {
+                try {
+                  await github.rest.checks.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    check_run_id: checkRun.data.id,
+                    status: 'completed',
+                    conclusion: 'failure',
+                    completed_at: new Date().toISOString(),
+                    output: {
+                      title: 'Workflow Execution Failed',
+                      summary: 'An unexpected error occurred during workflow execution.',
+                      text: `**Error:** ${error.message}\n\n**Troubleshooting:**\nCheck the workflow logs for detailed error information.`
+                    }
+                  });
+                  console.log('📋 Updated check run with error status');
+                } catch (updateError) {
+                  console.error('Failed to update check run:', updateError.message);
+                }
+              }
+
+              // Re-throw to ensure workflow fails
+              throw error;
             }
