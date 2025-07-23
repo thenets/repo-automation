@@ -65,8 +65,6 @@ This file contains changes to test feature branch labeling when needs_feature_br
 
 ```yaml
 needs_feature_branch: true
-release: 1.5
-backport: 1.4
 ```
 
 This should add the feature-branch label."""
@@ -155,8 +153,6 @@ This file contains changes to test feature branch labeling when needs_feature_br
 
 ```yaml
 needs_feature_branch: false
-release: 1.5
-backport: 1.4
 ```
 
 This should NOT add the feature-branch label."""
@@ -318,8 +314,6 @@ This file contains changes to test feature branch labeling with invalid value.
 
 ```yaml
 needs_feature_branch: maybe
-release: 1.5
-backport: 1.4
 ```
 
 This should cause the workflow to fail."""
@@ -400,8 +394,6 @@ This file contains changes to test feature branch labeling with empty value.
 
 ```yaml
 needs_feature_branch:
-release: 1.5
-backport: 1.4
 ```
 
 This should NOT add the feature-branch label."""
@@ -482,8 +474,6 @@ This file contains changes to test feature branch labeling with comments.
 
 ```yaml
 needs_feature_branch: true#this is a comment
-release: 1.5
-backport: 1.4
 ```
 
 The comment should be ignored and feature-branch label should be added."""
@@ -614,8 +604,6 @@ No YAML configuration initially."""
 
 ```yaml
 needs_feature_branch: false
-release: 1.5
-backport: 1.4
 ```
 
 The existing feature-branch label should be preserved."""
