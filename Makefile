@@ -40,10 +40,18 @@ format: venv ## Format code with ruff
 	./venv/bin/ruff format .
 
 .PHONY: test
-test: venv ## Run tests (parallel, up to 10 threads)
-	@echo "Running tests (parallel, up to 10 threads)..."
-	./venv/bin/pytest -v -n 10
+test: venv ## Run tests (parallel, up to 10 threads) with coverage
+	@echo "Running tests with coverage (parallel, up to 10 threads)..."
+	./venv/bin/pytest -v -n 10 \
+		--cov=. \
+		--cov-report=term-missing \
+		--cov-report=html:htmlcov \
+		--cov-report=xml:coverage.xml
 	@echo "Tests completed!"
+	@echo "Coverage reports generated:"
+	@echo "  - Terminal: coverage summary displayed above"
+	@echo "  - HTML: htmlcov/index.html"
+	@echo "  - XML: coverage.xml"
 
 .PHONY: test-list
 test-list: venv ## List all tests
