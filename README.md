@@ -16,6 +16,7 @@ This repository contains GitHub Actions workflows to automate common development
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Testing](#testing)
+- [Development](#development)
 - [License](#license)
 
 ## Workflow Structure
@@ -431,17 +432,219 @@ When external contributors (non-collaborators) create pull requests or issues, t
    - Change `if: github.repository == 'thenets/repo-automations'` to `if: github.repository == 'your-username/repo-automations'`
    - This line appears in all `keeper-*.yml` workflow files under `.github/workflows/`
 
+### Test File Structure
+
+The test suite is organized with shared fixtures and utilities in a centralized structure:
+
+```
+test/
+├── conftest.py                      # Shared fixtures and utilities for all tests
+├── test_triage_auto_add.py         # Triage label management and stale PR detection tests
+├── test_feature_branch_labeler.py  # Feature branch labeling tests (basic + error reporting)
+├── test_release_backport_labeler.py # Release/backport labeling tests (basic + error reporting)
+├── test_ready_for_review_labeling.py # Ready-for-review label workflow tests
+├── test_yaml_variations.py         # YAML parsing edge cases and format variations
+├── test_label_validation.py        # Label validation and error handling tests
+└── test_basic_functionality.py     # Basic smoke tests
+```
+
+**Key Components:**
+- **`conftest.py`**: Contains `GitHubTestManager` and `GitHubFixtures` classes with all shared test utilities (Git operations, PR/issue management, label operations, polling utilities)
+- **Integration Tests**: All test classes inherit from `GitHubFixtures` and use real GitHub API calls
+- **Error Reporting Tests**: Dedicated test classes for validation error comment lifecycle (creation, auto-cleanup)
+- **Parallel Execution**: Tests use thread-safe unique naming for parallel test execution
+
 ### Automated Testing
 
 Run the test suite:
 
 ```bash
-# Run all tests
+# Run all tests (Warning: Takes 1+ minutes)
 make test
 
+# Run specific test file
+./venv/bin/pytest test/test_feature_branch_labeler.py -v
+
 # Run specific test method
-make venv
 ./venv/bin/pytest -k test_stale_pr_detection_manual_trigger -v
+
+# Run specific test class
+./venv/bin/pytest test/test_feature_branch_labeler.py::TestFeatureBranchErrorReporting -v
+```
+
+## Development
+
+### Creating a New GitHub Action Workflow
+
+When adding a new automation workflow, follow these guidelines:
+
+#### 1. **Workflow Architecture**
+All new workflows should follow the **fork-compatible two-workflow pattern**:
+
+- **Data Collection**: Use `keeper-trigger.yml` to collect PR/issue metadata
+- **Action Workflow**: Create your new workflow triggered by `workflow_run` from `keeper-trigger`
+
+#### 2. **Design Pattern**
+Use `keeper-auto-label-release-backport.yml` as your reference template:
+
+```yaml
+name: "Your New Workflow"
+on:
+  workflow_run:
+    workflows: ["Keeper: Trigger Data Collection"]
+    types: [completed]
+
+jobs:
+  your-job:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.repository == 'thenets/repo-automations'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: pr-metadata
+      
+      # Your workflow logic here
+```
+
+#### 3. **Implementation Checklist**
+- [ ] **Trigger**: Use `workflow_run` from `keeper-trigger.yml`
+- [ ] **Repository Check**: Include `if: github.repository == 'your-org/your-repo'` condition
+- [ ] **Permissions**: Add required `issues: write` and `pull-requests: write` permissions
+- [ ] **Artifact Download**: Download `pr-metadata` artifact for PR/issue data
+- [ ] **Error Handling**: Implement error reporting with comments and check runs (see release/backport workflow)
+- [ ] **Fork Compatibility**: Test with external contributor PRs
+- [ ] **File Naming**: Use `keeper-{feature-name}.yml` convention
+
+#### 4. **Error Reporting Pattern**
+For workflows that validate YAML or user input, implement error reporting:
+
+```yaml
+- name: Post validation error comment
+  if: failure()
+  uses: actions/github-script@v7
+  with:
+    script: |
+      const comment = `🚨 YAML Validation Error: your feature
+      
+      **Invalid value found**: "${invalidValue}"
+      
+      **How to fix:**
+      1. Update your PR description
+      2. Use valid values from the accepted list
+      
+      Valid YAML format:
+      \`\`\`yaml
+      your_field: valid_value
+      \`\`\``;
+      
+      // Post comment and create check run
+```
+
+### Creating a New Test
+
+When adding tests for new workflows or features, follow these guidelines:
+
+#### 1. **Check Existing Fixtures**
+Before writing new test utilities, review `test/conftest.py`:
+
+```python
+# Available fixtures and utilities:
+class GitHubTestManager:
+    # Git operations: create_branch(), git_commit_and_push(), push_branch()
+    # PR/Issue management: create_pr(), create_issue(), close_pr()
+    # Label operations: create_label(), get_pr_labels(), pr_has_label()
+    # Comment operations: get_pr_comments(), pr_has_comment_containing()
+    # Polling utilities: poll_until_condition()
+
+class GitHubFixtures:
+    # test_repo: Temporary repository with basic labels
+    # integration_manager: GitHubTestManager instance
+    # github_manager: Function-scoped GitHubTestManager
+```
+
+#### 2. **Use Reference Pattern**
+Follow `test_release_backport_labeler.py` as your template:
+
+```python
+"""
+Test suite for your new workflow.
+
+This test validates that the workflow does X, Y, and Z.
+"""
+
+import pytest
+from .conftest import GitHubTestManager, GitHubFixtures
+
+@pytest.mark.integration
+class TestYourWorkflow(GitHubFixtures):
+    """Integration test cases for your workflow."""
+
+    def test_basic_functionality(self, test_repo, integration_manager):
+        """Test basic workflow functionality.
+        
+        Steps:
+        1. Create a new branch
+        2. Create file changes and commit
+        3. Create PR with test configuration
+        4. Wait for workflow to process
+        5. Verify expected behavior
+        6. Cleanup PR
+        """
+        repo_path = test_repo
+        
+        # Setup required labels
+        integration_manager.create_label(repo_path, "your-label", "FF0000", "Description")
+        
+        # Create test branch and changes
+        branch_name = f"test-your-feature-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+        
+        # Test implementation...
+
+@pytest.mark.integration  
+class TestYourWorkflowErrorReporting(GitHubFixtures):
+    """Test error reporting functionality."""
+    
+    def test_validation_error_comment_lifecycle(self, test_repo, integration_manager):
+        """Test error comment creation and auto-cleanup."""
+        # Follow error reporting test pattern from reference file
+```
+
+#### 3. **Test Structure Guidelines**
+- **File naming**: `test_{workflow_name}.py`
+- **Class organization**: Separate basic functionality from error reporting
+- **Integration tests**: Use `@pytest.mark.integration` decorator
+- **Real GitHub API**: All tests use real GitHub operations (not mocked)
+- **Cleanup**: Always cleanup PRs/branches in test teardown
+- **Thread safety**: Use `int(time.time())` for unique naming in parallel execution
+
+#### 4. **Testing Best Practices**
+- **Descriptive names**: Use clear test and branch names
+- **Comprehensive steps**: Document test steps in docstrings
+- **Polling pattern**: Use `poll_until_condition()` for async workflow results
+- **Error scenarios**: Test both success and failure cases
+- **Label verification**: Always verify expected labels are present/absent
+- **Comment verification**: Test error comment posting and cleanup
+
+#### 5. **Running Your Tests**
+```bash
+# Run your specific test file
+./venv/bin/pytest test/test_your_workflow.py -v
+
+# Run specific test method
+./venv/bin/pytest test/test_your_workflow.py::TestYourWorkflow::test_basic_functionality -v
+
+# Run error reporting tests
+./venv/bin/pytest test/test_your_workflow.py::TestYourWorkflowErrorReporting -v
 ```
 
 ## License
