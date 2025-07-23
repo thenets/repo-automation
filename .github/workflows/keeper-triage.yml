@@ -148,15 +148,18 @@ jobs:
 
                 // Check conditions
                 const hasReleaseLabel = labels.some(label => label.name.startsWith('release '));
+                const hasBackportLabel = labels.some(label => label.name.startsWith('backport '));
                 const hasTriageLabel = labels.some(label => label.name === 'triage');
                 const hasReadyForReviewLabel = labels.some(label => label.name === 'ready for review');
 
                 console.log(`Has release label: ${hasReleaseLabel}`);
+                console.log(`Has backport label: ${hasBackportLabel}`);
                 console.log(`Has triage label: ${hasTriageLabel}`);
                 console.log(`Has ready for review label: ${hasReadyForReviewLabel}`);
                 console.log(`Is draft: ${eventData.draft}`);
 
                 // Main logic: If PR has release label and not draft, add ready for review; otherwise add triage
+                // Note: PRs with backport labels should also not get triage labels (they should be left as-is)
                 if (hasReleaseLabel && !eventData.draft) {
                   // Add ready for review label if not already present
                   if (!hasReadyForReviewLabel) {
@@ -170,8 +173,8 @@ jobs:
                   } else {
                     console.log(`ℹ️ PR #${eventData.issue_number} already has "ready for review" label`);
                   }
-                } else {
-                  // Add triage label if not already present
+                } else if (!hasBackportLabel) {
+                  // Add triage label if not already present and no backport label exists
                   if (!hasTriageLabel) {
                     await github.rest.issues.addLabels({
                       owner: context.repo.owner,
@@ -180,13 +183,16 @@ jobs:
                       labels: ['triage']
                     });
                     if (!hasReleaseLabel) {
-                      console.log(`✅ Successfully added triage label to PR #${eventData.issue_number} (no release label)`);
+                      console.log(`✅ Successfully added triage label to PR #${eventData.issue_number} (no release/backport label)`);
                     } else {
                       console.log(`✅ Successfully added triage label to PR #${eventData.issue_number} (is draft)`);
                     }
                   } else {
                     console.log(`ℹ️ PR #${eventData.issue_number} already has triage label`);
                   }
+                } else {
+                  // PR has backport label - don't add any labels
+                  console.log(`ℹ️ PR #${eventData.issue_number} has backport label, skipping automatic labeling`);
                 }
 
               } catch (error) {
