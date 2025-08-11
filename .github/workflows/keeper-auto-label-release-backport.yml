@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Download event metadata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: event-metadata
           github-token: ${{ secrets.GITHUB_TOKEN }}
