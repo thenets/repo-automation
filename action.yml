@@ -6,6 +6,7 @@ branding:
   color: 'blue'
 
 inputs:
+  # Core inputs (always used)
   github-token:
     description: 'GitHub token for API access'
     required: true
@@ -16,12 +17,29 @@ inputs:
     description: 'Preview mode without making changes (true/false)'
     required: false
     default: 'false'
+  
+  # Feature-enabling inputs (optional - presence enables features)
+  accepted-releases:
+    description: 'JSON array of accepted release versions (e.g., ["1.0", "2.0", "devel"]) - enables release labeling'
+    required: false
+  accepted-backports:
+    description: 'JSON array of accepted backport versions (e.g., ["1.0", "2.0"]) - enables backport labeling'
+    required: false
+  enable-feature-branch:
+    description: 'Enable feature branch automation (true/false) - parses needs_feature_branch from YAML'
+    required: false
+    default: 'false'
+  stale-days:
+    description: 'Days before marking PRs as stale (number) - enables stale detection'
+    required: false
 
 outputs:
   labels-added:
     description: 'JSON array of labels that were added'
   actions-taken:
     description: 'Summary of all actions performed'
+  features-enabled:
+    description: 'JSON array of features that were enabled based on inputs'
 
 runs:
   using: 'composite'
@@ -38,10 +56,14 @@ runs:
           const triageModulePath = path.join('${{ github.action_path }}', 'src', 'triage-management.js');
           const triageModule = require(triageModulePath);
           
-          // Configure options
+          // Configure options with feature detection
           const options = {
             dryRun: '${{ inputs.dry-run }}' === 'true',
-            githubToken: '${{ inputs.custom-github-token || inputs.github-token }}'
+            githubToken: '${{ inputs.custom-github-token || inputs.github-token }}',
+            acceptedReleases: '${{ inputs.accepted-releases }}' ? JSON.parse('${{ inputs.accepted-releases }}') : null,
+            acceptedBackports: '${{ inputs.accepted-backports }}' ? JSON.parse('${{ inputs.accepted-backports }}') : null,
+            enableFeatureBranch: '${{ inputs.enable-feature-branch }}' === 'true',
+            staleDays: '${{ inputs.stale-days }}' ? parseInt('${{ inputs.stale-days }}') : null
           };
           
           try {
@@ -51,6 +73,7 @@ runs:
             // Set outputs
             core.setOutput('labels-added', JSON.stringify(result.labelsAdded || []));
             core.setOutput('actions-taken', result.summary || 'No actions taken');
+            core.setOutput('features-enabled', JSON.stringify(result.featuresEnabled || []));
             
             console.log('✅ Triage automation completed successfully');
             console.log(`📋 Summary: ${result.summary}`);
