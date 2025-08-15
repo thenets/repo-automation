@@ -269,20 +269,27 @@ class RepositoryAutomation {
       const hasTriageLabel = labelChecks['triage'];
       const hasReadyForReviewLabel = labelChecks['ready for review'];
 
+      // Also check for release content in YAML (for cases where the release label hasn't been added yet)
+      const yamlContent = this.config.parseYamlFromText(prData.body || '');
+      const hasReleaseYaml = yamlContent && this.config.parseYamlValue(yamlContent, 'release');
+      const hasBackportYaml = yamlContent && this.config.parseYamlValue(yamlContent, 'backport');
+
       console.log(`🔍 Label analysis:`);
       console.log(`  - Has release label: ${hasReleaseLabel}`);
       console.log(`  - Has backport label: ${hasBackportLabel}`);
       console.log(`  - Has triage label: ${hasTriageLabel}`);
       console.log(`  - Has ready for review label: ${hasReadyForReviewLabel}`);
+      console.log(`  - Has release YAML: ${!!hasReleaseYaml}`);
+      console.log(`  - Has backport YAML: ${!!hasBackportYaml}`);
       console.log(`  - Is draft: ${prData.draft}`);
 
-      // Main logic: If PR has release label and not draft, add ready for review; otherwise add triage
-      if (hasReleaseLabel && !prData.draft) {
+      // Main logic: If PR has release label/YAML and not draft, add ready for review; otherwise add triage
+      if ((hasReleaseLabel || hasReleaseYaml) && !prData.draft) {
         await this.handleReadyForReviewLabel(prNumber, hasReadyForReviewLabel);
-      } else if (!hasBackportLabel) {
-        await this.handleTriageLabel(prNumber, hasTriageLabel, hasReleaseLabel);
+      } else if (!hasBackportLabel && !hasBackportYaml) {
+        await this.handleTriageLabel(prNumber, hasTriageLabel, hasReleaseLabel || !!hasReleaseYaml);
       } else {
-        console.log(`ℹ️ PR #${prNumber} has backport label, skipping automatic labeling`);
+        console.log(`ℹ️ PR #${prNumber} has backport label/YAML, skipping automatic labeling`);
       }
 
     } catch (error) {
