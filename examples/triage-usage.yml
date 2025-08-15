@@ -1,0 +1,102 @@
+# Example usage of the Repository Triage Automation action
+# This workflow demonstrates how to use the triage automation action
+# in your repository to automatically manage triage labels.
+
+name: Repository Triage Automation
+
+on:
+  # Trigger on new issues
+  issues:
+    types: [opened]
+  
+  # Trigger on pull request events
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+  
+  # Support for fork compatibility (if using keeper-trigger workflow)
+  workflow_run:
+    workflows: ["Keeper: trigger"]
+    types: [completed]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Repository Triage Automation
+        uses: ./  # Use local action (change to thenets/repo-automation@v1 when published)
+        with:
+          # Required: GitHub token for API access
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Optional: Custom token for external contributor support
+          # Recommended for public repositories that accept external contributions
+          custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+          
+          # Optional: Run in preview mode (no actual changes)
+          dry-run: false
+
+---
+
+# Alternative: Triage-only workflow (simpler)
+name: Simple Triage Automation
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto Triage
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+---
+
+# Advanced: With custom token for fork support
+name: Advanced Triage with Fork Support
+
+on:
+  issues:
+    types: [opened]
+  workflow_run:
+    workflows: ["Keeper: trigger"]
+    types: [completed]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    # Only run on your repository (replace with your repo name)
+    if: github.repository == 'your-org/your-repo'
+    
+    steps:
+      - name: Repository Triage Automation
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+          dry-run: false
+          
+      - name: Report Results
+        if: always()
+        run: |
+          echo "Triage automation completed"
+          echo "Labels added: ${{ steps.triage.outputs.labels-added }}"
+          echo "Actions taken: ${{ steps.triage.outputs.actions-taken }}"

@@ -219,6 +219,23 @@ class GitHubTestManager:
                 shutil.copy2(testing_file, temp_init_path / "TESTING.md")
                 print(f"Copied TESTING.md for PR testing")
             
+            # Copy GitHub Action files (action.yml and src/ directory)
+            action_file = current_repo / "action.yml"
+            if action_file.exists():
+                shutil.copy2(action_file, temp_init_path / "action.yml")
+                print(f"Copied action.yml for GitHub Action testing")
+            
+            src_dir = current_repo / "src"
+            if src_dir.exists():
+                shutil.copytree(src_dir, temp_init_path / "src")
+                print(f"Copied src/ directory for GitHub Action testing")
+            
+            # Copy examples directory
+            examples_dir = current_repo / "examples"
+            if examples_dir.exists():
+                shutil.copytree(examples_dir, temp_init_path / "examples")
+                print(f"Copied examples/ directory for GitHub Action testing")
+            
             # Prepare keeper workflow files for deployment (kept outside git initially)
             workflows_source = current_repo / ".github" / "workflows"
             workflows_staging = temp_init_path / "_workflows_staging"
@@ -241,9 +258,9 @@ class GitHubTestManager:
             if not github_token:
                 raise RepositoryError("GITHUB_TOKEN environment variable is required for repository initialization")
             
-            # Add and commit only TESTING.md file (workflows staged separately)
-            subprocess.run(["git", "add", "TESTING.md"], cwd=temp_init_path, check=True)
-            subprocess.run(["git", "commit", "-m", "Initial commit - testing file"], cwd=temp_init_path, check=True)
+            # Add and commit essential files (workflows staged separately)
+            subprocess.run(["git", "add", "TESTING.md", "action.yml", "src/", "examples/"], cwd=temp_init_path, check=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit - testing files and GitHub Action"], cwd=temp_init_path, check=True)
             
             # Add remote pointing to test repository with token authentication
             test_repo_url = f"https://{github_token}@github.com/{repo_config.full_name}.git"

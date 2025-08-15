@@ -2,6 +2,47 @@
 
 This repository contains GitHub Actions workflows to automate common development tasks for team projects.
 
+## 🚀 New: GitHub Action Available!
+
+**Repository Triage Automation** is now available as a reusable GitHub Action! Instead of copying multiple workflow files, you can now use our action directly in your repository.
+
+### Quick Start
+
+Add this to your `.github/workflows/triage.yml`:
+
+```yaml
+name: Repository Triage Automation
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, ready_for_review]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: thenets/repo-automation@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+```
+
+**Benefits:**
+- ✅ **No hardcoded repository references** - works with any repository
+- ✅ **Single file setup** instead of copying multiple workflow files  
+- ✅ **Automatic updates** when you pin to a version
+- ✅ **Fork compatible** with custom token support
+- ✅ **Dry-run mode** for testing
+
+See [examples/triage-usage.yml](examples/triage-usage.yml) for more configuration options.
+
+---
+
 ## Table of Contents
 
 - [Features](#features)

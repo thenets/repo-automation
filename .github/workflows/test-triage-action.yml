@@ -1,0 +1,67 @@
+---
+# Test workflow for the new triage action
+# This workflow tests our new composite action implementation
+
+name: "Test: Triage Action"
+
+on:
+  # Test on new issues
+  issues:
+    types: [opened]
+
+  # Test on pull request events
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode'
+        required: false
+        default: 'true'
+        type: boolean
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  test-triage-action:
+    runs-on: ubuntu-latest
+
+    # Only run on this repository for testing
+    if: github.repository == 'thenets/repo-automation'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test Triage Action
+        id: triage
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+          dry-run: ${{ github.event.inputs.dry_run || 'false' }}
+
+      - name: Display Results
+        if: always()
+        run: |
+          {
+            echo "## Triage Action Results"
+            echo ""
+            echo "**Labels Added:** \`${{ steps.triage.outputs.labels-added }}\`"
+            echo ""
+            echo "**Actions Taken:** ${{ steps.triage.outputs.actions-taken }}"
+            echo ""
+            echo "**Event:** ${{ github.event_name }}"
+            echo "**Action:** ${{ github.event.action }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Also log to console
+          echo "🎯 Triage Action Test Results:"
+          echo "Labels added: ${{ steps.triage.outputs.labels-added }}"
+          echo "Actions taken: ${{ steps.triage.outputs.actions-taken }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Action: ${{ github.event.action }}"
