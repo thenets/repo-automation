@@ -197,12 +197,15 @@ setup-token-test: venv ## Test and validate GitHub token setup
 	@echo "  ./venv/bin/pytest -m fork_compatibility -v"
 
 clean: ## Clean up temporary files
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
-	find . -type d -name ".pytest_cache" -delete
+	find . -type f -name "*.pyc" -delete || true
+	find . -type d -name "__pycache__" -delete || true
+	find . -type d -name ".pytest_cache" -delete || true
 	rm -rf .ruff_cache/
 	rm -rf venv/
 	rm -rf cache/
+	rm -rf .pytest_cache/
+	rm -rf htmlcov/
+	rm -f .coverage* coverage.xml
 	rm -f actionlint
 
 
