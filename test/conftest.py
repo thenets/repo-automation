@@ -46,6 +46,32 @@ class GitHubTestManager:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.config = config or get_test_config()
 
+    def generate_testing_md_content(self) -> str:
+        """Generate dynamic TESTING.md content for PR testing scenarios.
+        
+        Returns:
+            str: Content for TESTING.md file
+        """
+        return """# Testing file
+
+This file contains random data, used for PR testing.
+"""
+
+    def ensure_testing_file_exists(self, repo_path: Path) -> Path:
+        """Ensure TESTING.md exists in the repository, creating it if necessary.
+        
+        Args:
+            repo_path: Path to the repository
+            
+        Returns:
+            Path: Path to the TESTING.md file
+        """
+        testing_file = repo_path / "TESTING.md"
+        if not testing_file.exists():
+            testing_content = self.generate_testing_md_content()
+            testing_file.write_text(testing_content)
+        return testing_file
+
     def setup_repository_secrets(self, repo_config: RepositoryConfig) -> bool:
         """Set up GitHub Actions secrets for the repository.
         
@@ -285,11 +311,11 @@ jobs:
             # Copy only essential automation files
             import shutil
             
-            # Copy TESTING.md for PR modification tests
-            testing_file = current_repo / "TESTING.md"
-            if testing_file.exists():
-                shutil.copy2(testing_file, temp_init_path / "TESTING.md")
-                print(f"Copied TESTING.md for PR testing")
+            # Create TESTING.md dynamically for PR modification tests
+            testing_content = self.generate_testing_md_content()
+            testing_file_path = temp_init_path / "TESTING.md"
+            testing_file_path.write_text(testing_content)
+            print(f"Created TESTING.md for PR testing")
             
             # Copy GitHub Action files (action.yml and src/ directory)
             action_file = current_repo / "action.yml"

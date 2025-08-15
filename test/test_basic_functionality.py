@@ -31,7 +31,7 @@ class TestBasicFunctionality(GitHubFixtures):
         github_manager.create_branch(repo_path, branch_name)
 
         # Modify a file (TESTING.md)
-        testing_file = repo_path / "TESTING.md"
+        testing_file = github_manager.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content

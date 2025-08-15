@@ -37,7 +37,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         integration_manager.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = integration_manager.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content
@@ -116,7 +116,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         integration_manager.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = integration_manager.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content
@@ -178,7 +178,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         integration_manager.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = integration_manager.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content
@@ -255,7 +255,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         integration_manager.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = integration_manager.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content
@@ -327,7 +327,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         integration_manager.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = integration_manager.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content
@@ -436,7 +436,7 @@ class TestStalePRDetector(GitHubFixtures):
         integration_manager.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = integration_manager.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content

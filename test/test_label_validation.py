@@ -61,7 +61,7 @@ class TestLabelValidation(GitHubFixtures):
         github_manager_class.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = github_manager_class.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content +
@@ -135,7 +135,7 @@ The workflow should fail because 'invalid-version' is not in the accepted releas
         github_manager_class.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = github_manager_class.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content +
@@ -210,7 +210,7 @@ backports list.
         github_manager_class.create_branch(repo_path, branch_name)
 
         # Modify TESTING.md
-        testing_file = repo_path / "TESTING.md"
+        testing_file = github_manager_class.ensure_testing_file_exists(repo_path)
         current_content = testing_file.read_text()
         new_content = (
             current_content +
