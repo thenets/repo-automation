@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from test_config import TestConfigManager, RepositoryConfig, TestingConfig, get_test_config
+from test_config import TestConfigManager, RepositoryConfig, RepositoryTestingConfig, get_test_config
 
 
 def check_prerequisites() -> Dict[str, bool]:
@@ -123,7 +123,7 @@ def validate_workflow_files() -> Dict[str, bool]:
     return workflow_files
 
 
-def print_setup_summary(config: TestingConfig, prerequisites: Dict[str, bool]):
+def print_setup_summary(config: RepositoryTestingConfig, prerequisites: Dict[str, bool]):
     """Print a summary of the setup configuration.
     
     Args:

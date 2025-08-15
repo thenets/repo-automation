@@ -191,7 +191,7 @@ class RepositoryConfig:
 
 
 @dataclass
-class TestingConfig:
+class RepositoryTestingConfig:
     """Configuration for multi-repository testing scenarios."""
     
     # Primary repository (organization repo)
@@ -227,7 +227,7 @@ class TestConfigManager:
     """Manages test configuration from .env file and git remote origin."""
     
     @staticmethod
-    def load_from_env_file(env_file_path: Path = Path(".env")) -> TestingConfig:
+    def load_from_env_file(env_file_path: Path = Path(".env")) -> "RepositoryTestingConfig":
         """Load testing configuration from .env file with fallback to git remote.
         
         Args:
@@ -244,7 +244,7 @@ class TestConfigManager:
         - TEST_POLL_INTERVAL: Polling interval for workflow checks (seconds)
         
         Returns:
-            TestingConfig: Configured testing environment
+            RepositoryTestingConfig: Configured testing environment
         """
         # Load all environment variables from .env file
         env_vars = load_env_file(env_file_path)
@@ -338,7 +338,7 @@ class TestConfigManager:
         test_timeout = int(env_vars.get("TEST_TIMEOUT") or os.getenv("TEST_TIMEOUT", "300"))
         poll_interval = int(env_vars.get("TEST_POLL_INTERVAL") or os.getenv("TEST_POLL_INTERVAL", "10"))
         
-        return TestingConfig(
+        return RepositoryTestingConfig(
             primary_repo=primary_config,
             fork_repo=fork_config,
             cache_dir=cache_dir,
@@ -347,7 +347,7 @@ class TestConfigManager:
         )
     
     @staticmethod
-    def create_default_config() -> TestingConfig:
+    def create_default_config() -> "RepositoryTestingConfig":
         """Deprecated: Configuration must be explicitly provided.
         
         Raises:
@@ -365,7 +365,7 @@ class TestConfigManager:
         org_repo: str,
         fork_owner: str,
         fork_repo: Optional[str] = None
-    ) -> TestingConfig:
+    ) -> "RepositoryTestingConfig":
         """Create configuration for organization + fork testing scenario.
         
         Args:
@@ -375,7 +375,7 @@ class TestConfigManager:
             fork_repo: Fork repository name (defaults to org_repo)
             
         Returns:
-            TestingConfig: Configuration for org + fork testing
+            RepositoryTestingConfig: Configuration for org + fork testing
         """
         if fork_repo is None:
             fork_repo = org_repo
@@ -395,19 +395,19 @@ class TestConfigManager:
             fork_parent=primary_config.full_name
         )
         
-        return TestingConfig(
+        return RepositoryTestingConfig(
             primary_repo=primary_config,
             fork_repo=fork_config
         )
 
 
-def get_test_config() -> TestingConfig:
+def get_test_config() -> "RepositoryTestingConfig":
     """Get the appropriate test configuration.
     
     Attempts to load from .env file first, falls back to git remote origin or defaults.
     
     Returns:
-        TestingConfig: Active testing configuration
+        RepositoryTestingConfig: Active testing configuration
     """
     # Always try to load from .env file first
     env_file = Path(".env")

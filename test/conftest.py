@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple
 import pytest
 
 from .test_config import (
-    TestingConfig, 
+    RepositoryTestingConfig, 
     RepositoryConfig, 
     get_test_config,
     update_workflow_repository_references,
@@ -39,7 +39,7 @@ class GitHubTestManager:
     def __init__(
         self, 
         cache_dir: Path = Path("./cache/test/repo"),
-        config: Optional[TestingConfig] = None
+        config: Optional[RepositoryTestingConfig] = None
     ):
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
