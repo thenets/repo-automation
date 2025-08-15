@@ -54,6 +54,18 @@ class LabelAutomation {
       
       if (!yamlContent) {
         console.log('ℹ️ No YAML frontmatter found in PR description');
+        
+        // Clean up any existing error comments when YAML is completely removed
+        if (features.featureBranch) {
+          console.log('🧹 Cleaning up feature branch error comments (no YAML found)');
+          await this.client.cleanupWorkflowComments(prData.number, '🚨 YAML Validation Error: feature branch');
+        }
+        
+        if (features.releaseLabeling || features.backportLabeling) {
+          console.log('🧹 Cleaning up release/backport error comments (no YAML found)');
+          await this.client.cleanupWorkflowComments(prData.number, '🚨 YAML Validation Error: release and backport');
+        }
+        
         return this.result;
       }
 
