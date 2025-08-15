@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import fcntl
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -315,17 +316,18 @@ class GitHubTestManager:
             )
 
     def create_temp_repo(self, repo_name: str) -> Path:
-        """Create a temporary local repository using the configured primary repository."""
-        # First, initialize the test repository with current source code
-        self.initialize_test_repository(self.config.primary_repo)
+        """Create a temporary local repository using the configured primary repository.
         
+        Note: Repository initialization is now handled by the session-scoped fixture,
+        so this method only clones the already-initialized external repository.
+        """
         repo_path = self.cache_dir / repo_name
 
         # Clean up if exists
         if repo_path.exists():
             subprocess.run(["rm", "-rf", str(repo_path)], check=True)
 
-        # Clone the configured primary repository with validation
+        # Clone the configured primary repository (which should already be initialized)
         return self.clone_target_repository(self.config.primary_repo, repo_name)
 
     def create_fork_repo(
@@ -971,6 +973,54 @@ class GitHubFixtures:
         random_suffix = random.randint(1000, 9999)
         return f"{prefix}-{int(timestamp)}-{thread_id}-{process_id}-{random_suffix}"
 
+    def get_repo_path(self, test_repo_fixture) -> Path:
+        """Safely get repository path from fixture with proper error handling.
+        
+        This method ensures that repository path assignment never fails with UnboundLocalError,
+        even if the fixture setup encounters issues during parallel execution.
+        
+        Args:
+            test_repo_fixture: The test_repo fixture value
+            
+        Returns:
+            Path: Valid repository path
+            
+        Raises:
+            RepositoryError: If repository path cannot be determined
+        """
+        try:
+            if test_repo_fixture is None:
+                raise RepositoryError("test_repo fixture returned None - repository setup failed")
+            
+            if not isinstance(test_repo_fixture, Path):
+                raise RepositoryError(f"test_repo fixture returned invalid type: {type(test_repo_fixture)}")
+            
+            if not test_repo_fixture.exists():
+                raise RepositoryError(f"Repository path does not exist: {test_repo_fixture}")
+                
+            return test_repo_fixture
+            
+        except Exception as e:
+            raise RepositoryError(f"Failed to get repository path: {e}")
+
+    def ensure_repository_initialized(self) -> None:
+        """Ensure that the external repository has been properly initialized.
+        
+        This method should be called at the start of test methods to verify
+        that the session-scoped initialization completed successfully.
+        
+        Raises:
+            RepositoryError: If repository initialization is incomplete
+        """
+        cache_dir = Path("./cache/test/repo")
+        complete_file_path = cache_dir / ".initialization_complete"
+        
+        if not complete_file_path.exists():
+            raise RepositoryError(
+                "External repository initialization not completed. "
+                "This typically indicates a session-level setup failure."
+            )
+
     @pytest.fixture(scope="function")
     def test_config(self):
         """Get the current test configuration."""
@@ -992,20 +1042,31 @@ class GitHubFixtures:
         return github_manager.clone_current_repo()
 
     @pytest.fixture(scope="class")
-    def test_repo(self, github_manager_class):
+    def test_repo(self, github_manager_class, initialize_external_repository):
         """Create a temporary repository using the configured primary repository.
         
-        This fixture reads TEST_GITHUB_ORG and TEST_GITHUB_REPO from .env file,
-        clones the repository, and sets up GitHub Actions secrets.
+        This fixture depends on session-scoped initialization and creates a local
+        clone of the already-initialized external repository for each test class.
         
         Raises:
             RepositoryError: If repository doesn't exist or cloning fails
         """
+        # Verify that initialization completed successfully
+        cache_dir = Path("./cache/test/repo")
+        complete_file_path = cache_dir / ".initialization_complete"
+        
+        if not complete_file_path.exists():
+            raise RepositoryError(
+                "External repository initialization not completed. "
+                "Session-scoped initialization may have failed."
+            )
+        
         # Create unique repository name per thread for parallel execution
         repo_name = self.generate_unique_name("test-repo")
 
+        repo_path = None
         try:
-            # Create temporary local repository (this validates and clones the target repo)
+            # Create temporary local repository (external repo is already initialized)
             repo_path = github_manager_class.create_temp_repo(repo_name)
 
             # Ensure required labels exist (create if they don't exist)
@@ -1038,12 +1099,16 @@ class GitHubFixtures:
                 raise RepositoryError(f"Failed to set up test repository: {e}")
 
         finally:
-            # Cleanup: remove temporary directory
-            subprocess.run(["rm", "-rf", str(repo_path)], check=False)
+            # Cleanup: remove temporary directory (only if it was created)
+            if repo_path is not None:
+                subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
     @pytest.fixture(scope="class")
-    def org_test_environment(self, github_manager_class):
+    def org_test_environment(self, github_manager_class, initialize_external_repository):
         """Create a complete organization + fork test environment.
+        
+        This fixture depends on session-scoped initialization to ensure the
+        external repository is properly set up before creating test environments.
         
         Returns:
             Tuple[Path, Optional[Path]]: (org_repo_path, fork_repo_path)
@@ -1079,4 +1144,84 @@ class GitHubFixtures:
     @pytest.fixture(scope="class")
     def integration_manager(self, github_manager_class):
         """GitHub manager specifically for integration tests."""
-        return github_manager_class 
+        return github_manager_class
+
+    @pytest.fixture(scope="session", autouse=True)
+    def initialize_external_repository(self):
+        """Initialize the external test repository once per test session.
+        
+        This fixture uses file locking to coordinate between parallel workers,
+        ensuring that repository initialization happens exactly once per test session.
+        """
+        config = get_test_config()
+        cache_dir = Path("./cache/test/repo")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        lock_file_path = cache_dir / ".initialization_lock"
+        complete_file_path = cache_dir / ".initialization_complete"
+        
+        # If already completed by another process, skip
+        if complete_file_path.exists():
+            print("✅ External repository already initialized by another worker")
+            return
+        
+        # Try to acquire lock for initialization
+        try:
+            with open(lock_file_path, 'w') as lock_file:
+                try:
+                    # Non-blocking lock attempt
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    print("🔒 Acquired initialization lock - performing repository setup...")
+                    
+                    # This worker will perform the initialization
+                    manager = GitHubTestManager(cache_dir=cache_dir, config=config)
+                    
+                    try:
+                        # Perform the actual initialization
+                        success = manager.initialize_test_repository(config.primary_repo)
+                        if success:
+                            # Signal completion to other workers
+                            complete_file_path.write_text("initialized")
+                            print("✅ External repository initialization completed successfully")
+                        else:
+                            raise RepositoryError("Repository initialization returned False")
+                            
+                    except Exception as e:
+                        print(f"❌ Repository initialization failed: {e}")
+                        # Clean up partial state on failure
+                        if complete_file_path.exists():
+                            complete_file_path.unlink()
+                        raise
+                        
+                except IOError:
+                    # Lock is held by another process - wait for completion
+                    print("⏳ Another worker is initializing repository, waiting...")
+                    
+                    # Wait for completion signal with timeout
+                    timeout = 300  # 5 minutes
+                    start_time = time.time()
+                    
+                    while not complete_file_path.exists():
+                        if time.time() - start_time > timeout:
+                            raise RepositoryError(
+                                "Timeout waiting for repository initialization by another worker"
+                            )
+                        time.sleep(2)
+                    
+                    print("✅ Repository initialization completed by another worker")
+                    
+        except Exception as e:
+            # Clean up lock file on any error
+            if lock_file_path.exists():
+                try:
+                    lock_file_path.unlink()
+                except:
+                    pass
+            raise
+        finally:
+            # Always clean up lock file when done
+            try:
+                if lock_file_path.exists():
+                    lock_file_path.unlink()
+            except:
+                pass 

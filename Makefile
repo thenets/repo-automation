@@ -71,6 +71,36 @@ _gh_auth_check: ## Check GitHub CLI authentication status
 		exit 1; \
 	fi
 
+.PHONY: _gh_auth_check_env
+_gh_auth_check_env: ## Check GitHub CLI authentication using .env token
+	@echo "Checking GitHub CLI authentication using .env configuration..."
+	@if [ ! -f .env ]; then \
+		echo "❌ .env file not found"; \
+		echo "Please run 'make setup-token' first to create .env file"; \
+		exit 1; \
+	fi
+	@eval $$(grep -v '^#' .env | xargs) && \
+	if [ -z "$$GITHUB_TOKEN" ]; then \
+		echo "❌ GITHUB_TOKEN not found in .env file"; \
+		echo "Please run 'make setup-token' to configure authentication"; \
+		exit 1; \
+	fi && \
+	if [ -z "$$TEST_GITHUB_ORG" ] || [ -z "$$TEST_GITHUB_REPO" ]; then \
+		echo "❌ TEST_GITHUB_ORG or TEST_GITHUB_REPO not found in .env file"; \
+		echo "Please run 'make setup-token' to configure repository settings"; \
+		exit 1; \
+	fi && \
+	echo "Testing authentication and repository access..." && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	if gh repo view "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" >/dev/null 2>&1; then \
+		echo "✅ GitHub CLI authenticated with .env token"; \
+		echo "✅ Repository access confirmed: $$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO"; \
+	else \
+		echo "❌ Authentication or repository access failed"; \
+		echo "Please check your token permissions for $$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO"; \
+		exit 1; \
+	fi
+
 .PHONY: setup-token
 setup-token: _gh_auth_check ## Generate GitHub token and create .env file for testing
 	@echo "Setting up GitHub token for external repository testing..."
@@ -181,9 +211,81 @@ clean: ## Clean up temporary files
 # -------------
 
 .PHONY: debug-gh-list-pr
-debug-gh-list-pr: ## List all PRs
-	gh pr list --state all --limit 10
+debug-gh-list-pr: _gh_auth_check_env ## List all PRs using .env configuration
+	@echo "Listing PRs for repository from .env configuration..."
+	@eval $$(grep -v '^#' .env | xargs) && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	gh pr list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --state all --limit 10
 
-debug-clean-prs-and-branches: ## Close all PRs and delete branches
-	gh pr list --state open --limit 1000 | awk '{print $$1}' | xargs -I {} gh pr close {}
-	gh api repos/:owner/:repo/git/refs/heads | jq -r '.[] | select(.ref != "refs/heads/main") | .ref | sub("refs/heads/"; "")' | xargs -I {} gh api -X DELETE repos/:owner/:repo/git/refs/heads/{}
+.PHONY: debug-gh-list-pr-open
+debug-gh-list-pr-open: _gh_auth_check_env ## List open PRs using .env configuration
+	@echo "Listing open PRs for repository from .env configuration..."
+	@eval $$(grep -v '^#' .env | xargs) && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	gh pr list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --state open --limit 20
+
+.PHONY: debug-gh-list-branches
+debug-gh-list-branches: _gh_auth_check_env ## List all branches using .env configuration
+	@echo "Listing branches for repository from .env configuration..."
+	@eval $$(grep -v '^#' .env | xargs) && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	gh api repos/"$$TEST_GITHUB_ORG"/"$$TEST_GITHUB_REPO"/branches | jq -r '.[].name' | head -20
+
+.PHONY: debug-gh-repo-info
+debug-gh-repo-info: _gh_auth_check_env ## Show repository information using .env configuration
+	@echo "Repository information from .env configuration:"
+	@eval $$(grep -v '^#' .env | xargs) && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	echo "Repository: $$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" && \
+	echo "" && \
+	gh repo view "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO"
+
+.PHONY: debug-clean-prs-and-branches
+debug-clean-prs-and-branches: _gh_auth_check_env ## Close all PRs and delete branches using .env configuration
+	@echo "⚠️  WARNING: This will close ALL open PRs and delete ALL non-main branches!"
+	@echo "Repository: $$(eval $$(grep -v '^#' .env | xargs) && echo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO")"
+	@echo ""
+	@read -p "Are you sure you want to continue? [y/N]: " confirm && \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		eval $$(grep -v '^#' .env | xargs) && \
+		export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+		echo "Closing all open PRs..." && \
+		gh pr list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --state open --limit 1000 --json number --jq '.[].number' | \
+		xargs -I {} sh -c 'echo "Closing PR #{}..." && gh pr close {} --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO"' && \
+		echo "Deleting all non-main branches..." && \
+		gh api repos/"$$TEST_GITHUB_ORG"/"$$TEST_GITHUB_REPO"/git/refs/heads | \
+		jq -r '.[] | select(.ref != "refs/heads/main") | .ref | sub("refs/heads/"; "")' | \
+		xargs -I {} sh -c 'echo "Deleting branch {}..." && gh api -X DELETE repos/"$$TEST_GITHUB_ORG"/"$$TEST_GITHUB_REPO"/git/refs/heads/{}' && \
+		echo "✅ Cleanup completed!"; \
+	else \
+		echo "Operation cancelled."; \
+	fi
+
+.PHONY: debug-gh-list-runs
+debug-gh-list-runs: _gh_auth_check_env ## List recent workflow runs using .env configuration
+	@echo "Listing recent workflow runs for repository from .env configuration..."
+	@eval $$(grep -v '^#' .env | xargs) && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	gh run list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --limit 10
+
+.PHONY: debug-gh-list-runs-failed
+debug-gh-list-runs-failed: _gh_auth_check_env ## List recent failed workflow runs using .env configuration
+	@echo "Listing recent failed workflow runs for repository from .env configuration..."
+	@eval $$(grep -v '^#' .env | xargs) && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	gh run list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --status failure --limit 10
+
+.PHONY: debug-test-env
+debug-test-env: _gh_auth_check_env ## Test .env configuration and show current settings
+	@echo "=== .env Configuration Test ==="
+	@echo ""
+	@eval $$(grep -v '^#' .env | xargs) && \
+	echo "TEST_GITHUB_ORG: $$TEST_GITHUB_ORG" && \
+	echo "TEST_GITHUB_REPO: $$TEST_GITHUB_REPO" && \
+	echo "GITHUB_TOKEN: [hidden for security]" && \
+	echo "" && \
+	export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+	echo "Testing repository access..." && \
+	gh repo view "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --json name,owner,visibility,isPrivate && \
+	echo "" && \
+	echo "✅ Configuration is working correctly!"
