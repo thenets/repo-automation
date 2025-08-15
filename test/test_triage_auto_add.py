@@ -5,6 +5,9 @@ This test validates that the workflow automatically adds the "triage" label
 to new issues and pull requests.
 """
 
+import subprocess
+import time
+
 import pytest
 
 from .conftest import GitHubTestManager, GitHubFixtures
