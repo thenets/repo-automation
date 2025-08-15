@@ -1,18 +1,23 @@
 /**
- * Triage Management Module
- * Extracted and modularized logic from keeper-triage.yml
+ * Repository Automation Orchestrator
+ * Main entry point for all repository automation features
  * 
- * Handles:
+ * Core Features (always enabled):
  * - Auto-add triage labels to new issues
  * - Smart PR labeling (triage vs ready-for-review based on release labels)
  * - Triage label protection (re-add if removed without release/backport labels)
  * - Fork compatibility through workflow_run events
+ * 
+ * Optional Features (enabled by inputs):
+ * - Release/backport auto-labeling (when accepted-releases/accepted-backports provided)
+ * - Feature branch automation (when enable-feature-branch is true)
+ * - Stale PR detection (when stale-days provided or schedule event)
  */
 
 const { ConfigManager } = require('./utils/config');
 const { GitHubClient } = require('./utils/github-client');
 
-class TriageManager {
+class RepositoryAutomation {
   constructor(context, github, options = {}) {
     this.context = context;
     this.github = github;
@@ -21,36 +26,142 @@ class TriageManager {
     this.result = {
       labelsAdded: [],
       summary: '',
-      actions: []
+      actions: [],
+      featuresEnabled: []
     };
+    
+    // Detect enabled features based on inputs
+    this.features = this.detectEnabledFeatures();
   }
 
   /**
-   * Main execution function
+   * Detect which features are enabled based on provided inputs
+   */
+  detectEnabledFeatures() {
+    const options = this.config.options;
+    
+    const features = {
+      triage: true, // Always enabled (core functionality)
+      releaseLabeling: !!(options.acceptedReleases && options.acceptedReleases.length > 0),
+      backportLabeling: !!(options.acceptedBackports && options.acceptedBackports.length > 0),
+      featureBranch: options.enableFeatureBranch === true,
+      staleDetection: !!(options.staleDays) || this.context.eventName === 'schedule'
+    };
+    
+    // Log enabled features
+    const enabledFeatures = Object.keys(features).filter(f => features[f]);
+    console.log(`🎯 Enabled features: ${enabledFeatures.join(', ')}`);
+    
+    return features;
+  }
+
+  /**
+   * Main execution function - orchestrates all enabled features
    */
   async execute() {
     try {
       this.config.validate();
       this.config.logConfig();
 
-      console.log(`🔄 Starting triage automation for event: ${this.context.eventName}`);
+      console.log(`🔄 Starting repository automation for event: ${this.context.eventName}`);
+      
+      // Store enabled features in result
+      this.result.featuresEnabled = Object.keys(this.features).filter(f => this.features[f]);
 
-      // Handle different event types
-      if (this.context.eventName === 'issues') {
-        await this.handleIssueEvent();
-      } else if (this.context.eventName === 'workflow_run') {
-        await this.handleWorkflowRunEvent();
-      } else {
-        console.log(`ℹ️ Event type ${this.context.eventName} not handled by triage automation`);
-        this.result.summary = `Event type ${this.context.eventName} not handled`;
+      // Always run core triage automation
+      await this.executeTriageAutomation();
+      
+      // Run optional features based on inputs and event types
+      if (this.features.releaseLabeling || this.features.backportLabeling || this.features.featureBranch) {
+        await this.executeLabelAutomation();
+      }
+      
+      if (this.features.staleDetection) {
+        await this.executeStaleDetection();
       }
 
       return this.result;
 
     } catch (error) {
-      console.error('❌ Triage automation failed:', error.message);
+      console.error('❌ Repository automation failed:', error.message);
       this.result.summary = `Failed: ${error.message}`;
       throw error;
+    }
+  }
+
+  /**
+   * Execute core triage automation (always runs)
+   */
+  async executeTriageAutomation() {
+    console.log('🏷️ Executing core triage automation...');
+    
+    // Handle different event types for triage
+    if (this.context.eventName === 'issues') {
+      await this.handleIssueEvent();
+    } else if (this.context.eventName === 'workflow_run') {
+      await this.handleWorkflowRunEvent();
+    } else if (this.context.eventName === 'pull_request') {
+      // Direct PR events (when not using workflow_run pattern)
+      const prData = this.context.payload.pull_request;
+      await this.handlePullRequestEvent(prData);
+    } else {
+      console.log(`ℹ️ Event type ${this.context.eventName} not handled by triage automation`);
+    }
+  }
+
+  /**
+   * Execute label automation features (release/backport/feature-branch)
+   */
+  async executeLabelAutomation() {
+    console.log('🔖 Executing label automation...');
+    
+    try {
+      // Only process pull_request or workflow_run events for label automation
+      if (this.context.eventName === 'pull_request' || this.context.eventName === 'workflow_run') {
+        // Import label automation module when needed
+        const { LabelAutomation } = require('./label-automation');
+        const labelAutomation = new LabelAutomation(this.context, this.github, this.config.options);
+        
+        const labelResult = await labelAutomation.execute(this.features);
+        
+        // Merge results
+        this.result.labelsAdded.push(...(labelResult.labelsAdded || []));
+        this.result.actions.push(...(labelResult.actions || []));
+      }
+    } catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') {
+        console.log('ℹ️ Label automation module not yet implemented, skipping...');
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Execute stale detection feature
+   */
+  async executeStaleDetection() {
+    console.log('⏰ Executing stale detection...');
+    
+    try {
+      // Only run stale detection on schedule events or when explicitly requested
+      if (this.context.eventName === 'schedule' || this.features.staleDetection) {
+        // Import stale detection module when needed
+        const { StaleDetection } = require('./stale-detection');
+        const staleDetection = new StaleDetection(this.context, this.github, this.config.options);
+        
+        const staleResult = await staleDetection.execute();
+        
+        // Merge results
+        this.result.labelsAdded.push(...(staleResult.labelsAdded || []));
+        this.result.actions.push(...(staleResult.actions || []));
+      }
+    } catch (error) {
+      if (error.code === 'MODULE_NOT_FOUND') {
+        console.log('ℹ️ Stale detection module not yet implemented, skipping...');
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -252,8 +363,8 @@ class TriageManager {
  * Main execute function for the action
  */
 async function execute(context, github, options = {}) {
-  const manager = new TriageManager(context, github, options);
-  const result = await manager.execute();
+  const automation = new RepositoryAutomation(context, github, options);
+  const result = await automation.execute();
   
   // Generate summary
   if (result.actions.length > 0) {
@@ -262,7 +373,11 @@ async function execute(context, github, options = {}) {
     result.summary = result.summary || 'No actions needed';
   }
   
+  console.log(`✅ Repository automation completed successfully`);
+  console.log(`📋 Features enabled: ${result.featuresEnabled.join(', ')}`);
+  console.log(`📋 Summary: ${result.summary}`);
+  
   return result;
 }
 
-module.exports = { TriageManager, execute };
+module.exports = { RepositoryAutomation, execute };

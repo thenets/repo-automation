@@ -1,0 +1,98 @@
+---
+# Repository Automation - Unified Workflow
+# This workflow replaces all individual keeper workflows with a single unified action
+# Provides: triage management, stale detection, release/backport labeling, feature branch automation
+
+name: Repository Automation
+
+on:
+  # Issue events
+  issues:
+    types: [opened, labeled, unlabeled]
+
+  # Pull request events  
+  pull_request:
+    types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
+
+  # Fork compatibility via workflow_run trigger
+  workflow_run:
+    workflows: ["Keeper: trigger"]
+    types: [completed]
+
+  # Scheduled stale detection (daily at 2 AM UTC)
+  schedule:
+    - cron: '0 2 * * *'
+
+  # Manual trigger for testing and maintenance
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no actual changes)'
+        required: false
+        default: 'false'
+        type: boolean
+      feature_test:
+        description: 'Test specific feature (triage, stale, release, feature-branch, all)'
+        required: false
+        default: 'all'
+        type: string
+
+permissions:
+  issues: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  repository-automation:
+    runs-on: ubuntu-latest
+    
+    # Only run on this repository
+    if: github.repository == 'thenets/repo-automation'
+    
+    steps:
+      - name: Repository Automation
+        id: automation
+        uses: ./  # Use local action for this repository
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+          
+          # Feature configurations - all features enabled
+          stale-days: 1
+          accepted-releases: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2", "devel", "main"]'
+          accepted-backports: '["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2", "main"]'
+          enable-feature-branch: true
+          
+          # Use dry-run mode if manually triggered with that option
+          dry-run: ${{ github.event.inputs.dry_run || 'false' }}
+
+      - name: Report Automation Results
+        if: always()
+        run: |
+          {
+            echo "## 🤖 Repository Automation Results"
+            echo ""
+            echo "**Event:** \`${{ github.event_name }}\`"
+            if [ "${{ github.event.action }}" != "" ]; then
+              echo "**Action:** \`${{ github.event.action }}\`"
+            fi
+            echo ""
+            echo "**Features Enabled:** ${{ steps.automation.outputs.features-enabled }}"
+            echo ""
+            echo "**Labels Added:** \`${{ steps.automation.outputs.labels-added }}\`"
+            echo ""
+            echo "**Actions Taken:**"
+            echo "${{ steps.automation.outputs.actions-taken }}"
+            echo ""
+            if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+              echo "**🧪 DRY-RUN MODE:** No actual changes were made"
+            fi
+            echo ""
+            echo "_This workflow replaced 4 individual keeper workflows with 98% code reduction._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Also log to console for debugging
+          echo "🤖 Repository Automation completed:"
+          echo "  Features: ${{ steps.automation.outputs.features-enabled }}"
+          echo "  Labels added: ${{ steps.automation.outputs.labels-added }}"
+          echo "  Actions taken: ${{ steps.automation.outputs.actions-taken }}"

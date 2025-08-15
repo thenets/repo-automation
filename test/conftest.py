@@ -28,6 +28,31 @@ from .test_config import (
 )
 
 
+def pytest_sessionstart(session):
+    """
+    Called after the Session object has been created but before pytest starts collecting tests.
+    
+    This ensures initialization markers are cleaned up before any parallel workers start,
+    preventing race conditions in parallel test execution.
+    """
+    cache_dir = Path("./cache/test/repo")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Force cleanup of initialization markers and lock files
+    complete_file_path = cache_dir / ".initialization_complete"
+    lock_file_path = cache_dir / ".initialization_lock"
+    
+    if complete_file_path.exists():
+        print("🔄 [pytest_sessionstart] Removing initialization completion marker to force repository update...")
+        complete_file_path.unlink()
+    
+    if lock_file_path.exists():
+        print("🧹 [pytest_sessionstart] Cleaning up stale lock file from previous run...")
+        lock_file_path.unlink()
+    
+    print("✅ [pytest_sessionstart] Repository reinitialization setup complete")
+
+
 class RepositoryError(Exception):
     """Exception raised when repository operations fail."""
     pass
@@ -177,6 +202,72 @@ class GitHubTestManager:
 
         return clone_path
 
+    def generate_example_workflow(self, repo_config: RepositoryConfig) -> str:
+        """Generate a clean example workflow from comprehensive-usage.yml for the test repository.
+        
+        Args:
+            repo_config: Target repository configuration
+            
+        Returns:
+            str: Generated workflow YAML content
+        """
+        # Use local action for testing (./), published action would be thenets/repo-automation@v1
+        action_reference = "./"  # Local action reference for testing
+        
+        workflow_content = f"""---
+# Complete Repository Automation - Generated from examples/comprehensive-usage.yml
+# This workflow demonstrates the unified GitHub Action replacing 4 individual keeper workflows
+
+name: Complete Repository Automation
+on:
+  issues:
+    types: [opened, labeled, unlabeled]
+  pull_request:
+    types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
+  workflow_run:
+    workflows: ["Keeper: trigger"]
+    types: [completed]
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC for stale detection
+  workflow_dispatch:  # Manual trigger for testing
+
+permissions:
+  issues: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  repository-automation:
+    runs-on: ubuntu-latest
+    if: github.repository == '{repo_config.full_name}'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{{{ secrets.CUSTOM_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}}}
+        
+      - name: Complete Repository Automation
+        uses: {action_reference}
+        with:
+          github-token: ${{{{ secrets.GITHUB_TOKEN }}}}
+          custom-github-token: ${{{{ secrets.CUSTOM_GITHUB_TOKEN }}}}
+          
+          # Stale detection configuration (enables stale detection)
+          stale-days: 1
+          
+          # Release/backport labeling configuration (enables auto-labeling)
+          accepted-releases: '["1.0", "1.1", "1.2", "2.0", "2.1", "devel"]'
+          accepted-backports: '["1.0", "1.1", "1.2", "2.0", "2.1"]'
+          
+          # Feature branch automation (enables feature branch labeling)
+          enable-feature-branch: true
+          
+          # Optional: dry-run mode for testing
+          dry-run: false
+"""
+        return workflow_content
+
     def initialize_test_repository(self, repo_config: RepositoryConfig) -> bool:
         """Initialize test repository with current source code by force-pushing from current repo.
         
@@ -236,22 +327,16 @@ class GitHubTestManager:
                 shutil.copytree(examples_dir, temp_init_path / "examples")
                 print(f"Copied examples/ directory for GitHub Action testing")
             
-            # Prepare keeper workflow files for deployment (kept outside git initially)
-            workflows_source = current_repo / ".github" / "workflows"
+            # Generate example workflow for test repository instead of copying internal workflows
             workflows_staging = temp_init_path / "_workflows_staging"
+            workflows_staging.mkdir(parents=True)
             
-            if workflows_source.exists():
-                # Create staging directory for workflows (not committed to git)
-                workflows_staging.mkdir(parents=True)
-                
-                # Copy only keeper-*.yml files
-                keeper_files = list(workflows_source.glob("keeper-*.yml"))
-                for workflow_file in keeper_files:
-                    shutil.copy2(workflow_file, workflows_staging / workflow_file.name)
-                
-                print(f"Staged {len(keeper_files)} keeper workflow files for deployment")
-            else:
-                print("⚠️ No .github/workflows directory found")
+            # Generate clean example workflow from comprehensive-usage.yml
+            example_workflow_content = self.generate_example_workflow(repo_config)
+            example_workflow_path = workflows_staging / "repository-automation.yml"
+            example_workflow_path.write_text(example_workflow_content)
+            
+            print(f"Generated example workflow: repository-automation.yml for {repo_config.full_name}")
             
             # Get GITHUB_TOKEN for authenticated push
             github_token = os.getenv("GITHUB_TOKEN")
@@ -284,7 +369,7 @@ class GitHubTestManager:
                 print(f"Git push stdout: {result.stdout}")
                 raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
             
-            # Now deploy keeper workflows to .github/workflows directory
+            # Now deploy generated example workflow to .github/workflows directory
             workflows_staging = temp_init_path / "_workflows_staging"
             if workflows_staging.exists():
                 # Create .github/workflows directory
@@ -292,15 +377,17 @@ class GitHubTestManager:
                 workflows_dir = github_dir / "workflows" 
                 workflows_dir.mkdir(parents=True)
                 
-                # Copy workflow files to .github/workflows
+                # Copy generated workflow to .github/workflows
+                deployed_workflows = []
                 for workflow_file in workflows_staging.glob("*.yml"):
                     shutil.copy2(workflow_file, workflows_dir / workflow_file.name)
+                    deployed_workflows.append(workflow_file.name)
                 
                 # Stage and commit .github directory
                 subprocess.run(["git", "add", ".github/"], cwd=temp_init_path, check=True)
-                subprocess.run(["git", "commit", "-m", "Add keeper workflows"], cwd=temp_init_path, check=True)
+                subprocess.run(["git", "commit", "-m", "Add example repository automation workflow"], cwd=temp_init_path, check=True)
                 
-                print(f"Pushing keeper workflows to {repo_config.full_name}...")
+                print(f"Pushing example workflow to {repo_config.full_name}: {', '.join(deployed_workflows)}")
                 workflow_result = subprocess.run(
                     ["git", "push", "origin", "main"],
                     cwd=temp_init_path,
@@ -309,12 +396,12 @@ class GitHubTestManager:
                 )
                 
                 if workflow_result.returncode != 0:
-                    print(f"❌ Could not push keeper workflows: {workflow_result.stderr}")
+                    print(f"❌ Could not push workflow: {workflow_result.stderr}")
                     print("💡 This might be due to missing 'Workflow: Write' account permission.")
                     print("   Please check your GitHub token permissions and try again.")
-                    raise RepositoryError(f"Failed to push workflows to {repo_config.full_name}")
+                    raise RepositoryError(f"Failed to push workflow to {repo_config.full_name}")
                 else:
-                    print(f"✅ Successfully pushed keeper workflows to .github/workflows/")
+                    print(f"✅ Successfully pushed example workflow: {', '.join(deployed_workflows)}")
             
             # Clean up temp directory
             subprocess.run(["rm", "-rf", str(temp_init_path)], check=False)
@@ -407,13 +494,18 @@ class GitHubTestManager:
             return False
 
         success = True
-        for workflow_file in current_workflows_dir.glob("keeper-*.yml"):
+        # Copy all workflow files except test workflows
+        for workflow_file in current_workflows_dir.glob("*.yml"):
+            # Skip test workflows from being deployed to external test repositories
+            if workflow_file.name.startswith("test-"):
+                continue
+                
             target_file = workflows_dir / workflow_file.name
             
             # Copy workflow file
             target_file.write_text(workflow_file.read_text())
             
-            # Update repository references
+            # Update repository references for workflows that have them
             if not update_workflow_repository_references(
                 target_file, 
                 target_repo_config, 
@@ -1177,10 +1269,16 @@ class GitHubFixtures:
         lock_file_path = cache_dir / ".initialization_lock"
         complete_file_path = cache_dir / ".initialization_complete"
         
-        # If already completed by another process, skip
+        # ALWAYS force re-initialization by removing completion marker
+        # This ensures the test repository is updated with current source code
         if complete_file_path.exists():
-            print("✅ External repository already initialized by another worker")
-            return
+            print("🔄 Removing existing initialization marker to force repository update...")
+            complete_file_path.unlink()
+        
+        # Clean up any stale lock files from previous runs
+        if lock_file_path.exists():
+            print("🧹 Cleaning up stale lock file from previous run...")
+            lock_file_path.unlink()
         
         # Try to acquire lock for initialization
         try:

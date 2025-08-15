@@ -21,6 +21,17 @@ on:
         required: false
         default: 'true'
         type: boolean
+      test_feature:
+        description: 'Test specific feature set (basic, stale, release, feature-branch, complete)'
+        required: false
+        default: 'complete'
+        type: choice
+        options:
+          - basic
+          - stale
+          - release
+          - feature-branch
+          - complete
 
 permissions:
   issues: write
@@ -44,24 +55,47 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
           dry-run: ${{ github.event.inputs.dry_run || 'false' }}
+          
+          # Feature configurations based on test selection
+          stale-days: ${{ (github.event.inputs.test_feature == 'stale' || github.event.inputs.test_feature == 'complete') && '1' || '' }}
+          accepted-releases: ${{ (github.event.inputs.test_feature == 'release' || github.event.inputs.test_feature == 'complete') && '["1.0", "2.0", "devel"]' || '' }}
+          accepted-backports: ${{ (github.event.inputs.test_feature == 'release' || github.event.inputs.test_feature == 'complete') && '["1.0", "2.0"]' || '' }}
+          enable-feature-branch: ${{ (github.event.inputs.test_feature == 'feature-branch' || github.event.inputs.test_feature == 'complete') && 'true' || 'false' }}
 
       - name: Display Results
         if: always()
         run: |
           {
-            echo "## Triage Action Results"
+            echo "## 🧪 Triage Action Test Results"
+            echo ""
+            echo "**Test Mode:** \`${{ github.event.inputs.test_feature || 'auto-trigger' }}\`"
+            if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+              echo "**Dry Run:** ✅ Enabled (no actual changes made)"
+            else
+              echo "**Dry Run:** ❌ Disabled (real changes made)"
+            fi
+            echo ""
+            echo "**Features Enabled:** ${{ steps.triage.outputs.features-enabled }}"
             echo ""
             echo "**Labels Added:** \`${{ steps.triage.outputs.labels-added }}\`"
             echo ""
-            echo "**Actions Taken:** ${{ steps.triage.outputs.actions-taken }}"
+            echo "**Actions Taken:**"
+            echo "${{ steps.triage.outputs.actions-taken }}"
             echo ""
-            echo "**Event:** ${{ github.event_name }}"
-            echo "**Action:** ${{ github.event.action }}"
+            echo "**Event Details:**"
+            echo "- Event: \`${{ github.event_name }}\`"
+            if [ "${{ github.event.action }}" != "" ]; then
+              echo "- Action: \`${{ github.event.action }}\`"
+            fi
+            echo ""
+            echo "_Testing the unified GitHub Action that replaced 4 individual keeper workflows._"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # Also log to console
-          echo "🎯 Triage Action Test Results:"
-          echo "Labels added: ${{ steps.triage.outputs.labels-added }}"
-          echo "Actions taken: ${{ steps.triage.outputs.actions-taken }}"
-          echo "Event: ${{ github.event_name }}"
-          echo "Action: ${{ github.event.action }}"
+          # Also log to console for debugging
+          echo "🧪 Triage Action Test completed:"
+          echo "  Test mode: ${{ github.event.inputs.test_feature || 'auto-trigger' }}"
+          echo "  Dry run: ${{ github.event.inputs.dry_run || 'false' }}"
+          echo "  Features: ${{ steps.triage.outputs.features-enabled }}"
+          echo "  Labels added: ${{ steps.triage.outputs.labels-added }}"
+          echo "  Actions taken: ${{ steps.triage.outputs.actions-taken }}"
+          echo "  Event: ${{ github.event_name }}/${{ github.event.action }}"
