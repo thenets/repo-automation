@@ -21,6 +21,7 @@ from .conftest import GitHubTestManager, GitHubFixtures
 class TestFeatureBranchLabeler(GitHubFixtures):
     """Integration test cases for the feature branch auto-labeler workflow."""
 
+    @pytest.mark.fork_compatibility
     def test_needs_feature_branch_true_labeling(self, test_repo, integration_manager):
         """Test that PR with needs_feature_branch: true gets feature-branch label.
 

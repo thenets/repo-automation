@@ -35,11 +35,11 @@ jobs:
   auto-label-release-backport:
     runs-on: ubuntu-latest
 
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.repository == 'dednets/repo-automation-test' && github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Download event metadata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: event-metadata
           github-token: ${{ secrets.GITHUB_TOKEN }}

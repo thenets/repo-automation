@@ -33,7 +33,7 @@ jobs:
     # CHANGE THIS: set your repo name here
     # this is used to prevent the workflow from running on other repos/forks
     # Also skip execution for draft PRs (let them be processed when marked ready for review)
-    if: github.repository == 'thenets/repo-automations' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+    if: github.repository == 'dednets/repo-automation-test' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
 
     env:
       # Define accepted release and backport values

@@ -8,12 +8,15 @@ import subprocess
 import time
 from pathlib import Path
 
+import pytest
+
 from .conftest import GitHubFixtures
 
 
 class TestBasicFunctionality(GitHubFixtures):
     """Basic functionality tests that don't require GitHub integration."""
 
+    @pytest.mark.fork_compatibility
     def test_hello(self, github_manager):
         """Test basic functionality of the GitHubTestManager class."""
         # Create a temporary repository using the existing repo-automations as remote

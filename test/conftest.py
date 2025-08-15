@@ -2,7 +2,8 @@
 Shared fixtures and utilities for the test suite.
 
 This module contains the most commonly used fixtures and test utilities
-that are shared across multiple test files.
+that are shared across multiple test files. Enhanced to support multi-repository
+testing with arbitrary organizations and fork scenarios.
 """
 
 import json
@@ -13,17 +14,144 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import pytest
 
+from .test_config import (
+    TestingConfig, 
+    RepositoryConfig, 
+    get_test_config,
+    update_workflow_repository_references,
+    validate_repository_exists
+)
+
+
+class RepositoryError(Exception):
+    """Exception raised when repository operations fail."""
+    pass
+
 
 class GitHubTestManager:
-    """Manages Git and GitHub operations for testing."""
+    """Manages Git and GitHub operations for testing with multi-repository support."""
 
-    def __init__(self, cache_dir: Path = Path("./cache/test/repo")):
+    def __init__(
+        self, 
+        cache_dir: Path = Path("./cache/test/repo"),
+        config: Optional[TestingConfig] = None
+    ):
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.config = config or get_test_config()
+
+    def setup_repository_secrets(self, repo_config: RepositoryConfig) -> bool:
+        """Set up GitHub Actions secrets for the repository.
+        
+        Args:
+            repo_config: Repository configuration
+            
+        Returns:
+            bool: True if secrets were set up successfully
+            
+        Raises:
+            RepositoryError: If repository doesn't exist or secrets setup fails
+        """
+        # Check if repository exists first
+        if not validate_repository_exists(repo_config.owner, repo_config.repo):
+            raise RepositoryError(
+                f"Repository {repo_config.full_name} does not exist or is not accessible. "
+                "Please check the repository name and your GitHub authentication."
+            )
+        
+        # Get GITHUB_TOKEN from environment
+        github_token = os.getenv("GITHUB_TOKEN")
+        if not github_token:
+            print("⚠️ GITHUB_TOKEN not found in environment - skipping secrets setup")
+            return False
+        
+        try:
+            # Set GITHUB_TOKEN as a repository secret for workflow testing
+            print(f"Setting up GITHUB_TOKEN secret for {repo_config.full_name}...")
+            result = subprocess.run(
+                [
+                    "gh", "secret", "set", "GITHUB_TOKEN",
+                    "--repo", repo_config.full_name,
+                    "--body", github_token
+                ],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            print(f"✅ Successfully set GITHUB_TOKEN secret for {repo_config.full_name}")
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to set repository secret: {e}")
+            print(f"   stdout: {e.stdout}")
+            print(f"   stderr: {e.stderr}")
+            return False
+
+    def clone_target_repository(self, repo_config: RepositoryConfig, target_name: str) -> Path:
+        """Clone the target repository specified in TEST_GITHUB_ORG/TEST_GITHUB_REPO.
+        
+        Args:
+            repo_config: Repository configuration to clone
+            target_name: Local directory name for the cloned repository
+            
+        Returns:
+            Path: Path to the cloned repository
+            
+        Raises:
+            RepositoryError: If repository doesn't exist or cloning fails
+        """
+        # Validate repository exists first
+        if not validate_repository_exists(repo_config.owner, repo_config.repo):
+            raise RepositoryError(
+                f"Repository {repo_config.full_name} does not exist or is not accessible. "
+                "Please check TEST_GITHUB_ORG and TEST_GITHUB_REPO in your .env file, "
+                "or ensure you're in a git repository with a GitHub origin remote."
+            )
+        
+        clone_path = self.cache_dir / target_name
+
+        # Clean up if exists
+        if clone_path.exists():
+            subprocess.run(["rm", "-rf", str(clone_path)], check=True)
+
+        try:
+            # Clone the repository
+            print(f"Cloning {repo_config.full_name} to {clone_path}...")
+            subprocess.run(
+                ["git", "clone", repo_config.github_url, str(clone_path)], 
+                check=True,
+                capture_output=True
+            )
+            
+            print(f"✅ Successfully cloned {repo_config.full_name}")
+            
+            # Set up repository secrets
+            self.setup_repository_secrets(repo_config)
+            
+            return clone_path
+            
+        except subprocess.CalledProcessError as e:
+            raise RepositoryError(
+                f"Failed to clone repository {repo_config.full_name}. "
+                f"Error: {e}. Please check your GitHub authentication and repository access."
+            )
+
+    def clone_repository(self, repo_config: RepositoryConfig, target_name: str) -> Path:
+        """Clone a repository to cache directory.
+        
+        Args:
+            repo_config: Repository configuration to clone
+            target_name: Local directory name for the cloned repository
+            
+        Returns:
+            Path: Path to the cloned repository
+        """
+        return self.clone_target_repository(repo_config, target_name)
 
     def clone_current_repo(self, target_name: str = "test-hello-repo") -> Path:
         """Clone the current git repo to cache directory."""
@@ -39,32 +167,369 @@ class GitHubTestManager:
 
         return clone_path
 
+    def initialize_test_repository(self, repo_config: RepositoryConfig) -> bool:
+        """Initialize test repository with current source code by force-pushing from current repo.
+        
+        This ensures the test repository contains all the latest workflows and source code
+        from the current working directory.
+        
+        Args:
+            repo_config: Target repository configuration to initialize
+            
+        Returns:
+            bool: True if initialization was successful
+            
+        Raises:
+            RepositoryError: If initialization fails
+        """
+        try:
+            print(f"Initializing test repository {repo_config.full_name} with current source code...")
+            
+            # Create a temporary directory for the initialization
+            temp_init_path = self.cache_dir / "temp-init"
+            if temp_init_path.exists():
+                subprocess.run(["rm", "-rf", str(temp_init_path)], check=True)
+            
+            # Clone current working directory to temp location
+            current_repo = Path.cwd()
+            subprocess.run(
+                ["git", "clone", str(current_repo), str(temp_init_path)], 
+                check=True,
+                capture_output=True
+            )
+            
+            # Update remote to point to test repository
+            test_repo_url = f"https://github.com/{repo_config.full_name}.git"
+            subprocess.run(
+                ["git", "remote", "set-url", "origin", test_repo_url],
+                cwd=temp_init_path,
+                check=True
+            )
+            
+            # Force push current main branch to test repository
+            print(f"Force-pushing current source to {repo_config.full_name}...")
+            result = subprocess.run(
+                ["git", "push", "-f", "origin", "main"],
+                cwd=temp_init_path,
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode != 0:
+                print(f"Git push stderr: {result.stderr}")
+                print(f"Git push stdout: {result.stdout}")
+                
+                # Check for workflow scope error and provide helpful message
+                if "without `workflow` scope" in result.stderr:
+                    print("\n❌ GitHub token is missing 'workflow' scope!")
+                    print("💡 To fix this:")
+                    print("   1. Go to: https://github.com/settings/personal-access-tokens/new")
+                    print("   2. Select 'Fine-grained personal access token'")
+                    print(f"   3. Choose 'Selected repositories' and select: {repo_config.full_name}")
+                    print("   4. Grant these repository permissions:")
+                    print("      - Actions: Read and write (required for workflow files)")
+                    print("      - Contents: Read and write (required for code and workflow files)") 
+                    print("      - Issues: Read and write (required for issue labeling)")
+                    print("      - Pull requests: Read and write (required for PR labeling)")
+                    print("      - Metadata: Read (required for repository access)")
+                    print("      - Administration: Read (optional, for advanced repository management)")
+                    print("   5. Update GITHUB_TOKEN in your .env file")
+                    print("")
+                
+                raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+            
+            # Clean up temp directory
+            subprocess.run(["rm", "-rf", str(temp_init_path)], check=False)
+            
+            print(f"✅ Successfully initialized {repo_config.full_name} with current source code")
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            # Clean up temp directory on error
+            temp_init_path = self.cache_dir / "temp-init"
+            if temp_init_path.exists():
+                subprocess.run(["rm", "-rf", str(temp_init_path)], check=False)
+                
+            raise RepositoryError(
+                f"Failed to initialize repository {repo_config.full_name}. "
+                f"Error: {e}. Please check your GitHub authentication and repository permissions."
+            )
+
     def create_temp_repo(self, repo_name: str) -> Path:
-        """Create a temporary local repository that uses the existing repo-automations as remote."""
+        """Create a temporary local repository using the configured primary repository."""
+        # First, initialize the test repository with current source code
+        self.initialize_test_repository(self.config.primary_repo)
+        
         repo_path = self.cache_dir / repo_name
 
         # Clean up if exists
         if repo_path.exists():
             subprocess.run(["rm", "-rf", str(repo_path)], check=True)
 
-        # Clone the existing repo-automations repository
-        subprocess.run(
+        # Clone the configured primary repository with validation
+        return self.clone_target_repository(self.config.primary_repo, repo_name)
+
+    def create_fork_repo(
+        self, 
+        fork_config: RepositoryConfig, 
+        org_repo_path: Path,
+        repo_name: str
+    ) -> Path:
+        """Create a fork repository for external contributor testing.
+        
+        Args:
+            fork_config: Fork repository configuration
+            org_repo_path: Path to the organization repository (to copy workflows from)
+            repo_name: Local directory name for the fork
+            
+        Returns:
+            Path: Path to the fork repository
+        """
+        fork_path = self.cache_dir / repo_name
+
+        # Clean up if exists
+        if fork_path.exists():
+            subprocess.run(["rm", "-rf", str(fork_path)], check=True)
+
+        # Clone the fork repository with validation
+        fork_path = self.clone_target_repository(fork_config, repo_name)
+
+        # Add organization repo as upstream remote
+        if fork_config.fork_parent:
+            parent_url = f"https://github.com/{fork_config.fork_parent}.git"
+            subprocess.run(
+                ["git", "remote", "add", "upstream", parent_url],
+                cwd=fork_path,
+                check=True
+            )
+
+        return fork_path
+
+    def setup_repository_workflows(
+        self, 
+        repo_path: Path, 
+        target_repo_config: RepositoryConfig
+    ) -> bool:
+        """Set up GitHub Actions workflows in a repository for testing.
+        
+        Args:
+            repo_path: Path to the repository
+            target_repo_config: Repository configuration for workflow targeting
+            
+        Returns:
+            bool: True if setup was successful
+        """
+        workflows_dir = repo_path / ".github" / "workflows"
+        if not workflows_dir.exists():
+            workflows_dir.mkdir(parents=True)
+
+        # Get workflow files from current repository
+        current_workflows_dir = Path.cwd() / ".github" / "workflows"
+        if not current_workflows_dir.exists():
+            return False
+
+        success = True
+        for workflow_file in current_workflows_dir.glob("keeper-*.yml"):
+            target_file = workflows_dir / workflow_file.name
+            
+            # Copy workflow file
+            target_file.write_text(workflow_file.read_text())
+            
+            # Update repository references
+            if not update_workflow_repository_references(
+                target_file, 
+                target_repo_config, 
+                backup=False
+            ):
+                success = False
+
+        return success
+
+    def create_organization_test_environment(self) -> Tuple[Path, Optional[Path]]:
+        """Create a complete organization + fork test environment.
+        
+        Returns:
+            Tuple[Path, Optional[Path]]: (org_repo_path, fork_repo_path)
+        """
+        # Generate unique names for parallel execution
+        timestamp = int(time.time())
+        thread_id = threading.get_ident()
+        
+        org_repo_name = f"test-org-{timestamp}-{thread_id}"
+        org_repo_path = self.clone_repository(
+            self.config.primary_repo, 
+            org_repo_name
+        )
+        
+        # Set up workflows for organization repository
+        self.setup_repository_workflows(org_repo_path, self.config.primary_repo)
+        
+        fork_repo_path = None
+        if self.config.fork_repo:
+            fork_repo_name = f"test-fork-{timestamp}-{thread_id}"
+            fork_repo_path = self.create_fork_repo(
+                self.config.fork_repo,
+                org_repo_path,
+                fork_repo_name
+            )
+            
+            # Set up workflows for fork repository (using fork's own config)
+            self.setup_repository_workflows(fork_repo_path, self.config.fork_repo)
+        
+        return org_repo_path, fork_repo_path
+
+    def simulate_external_contributor_pr(
+        self,
+        fork_repo_path: Path,
+        org_repo_path: Path,
+        pr_title: str,
+        pr_body: str,
+        branch_name: str
+    ) -> str:
+        """Simulate an external contributor creating a PR from fork to organization.
+        
+        Args:
+            fork_repo_path: Path to the fork repository
+            org_repo_path: Path to the organization repository  
+            pr_title: Title for the pull request
+            pr_body: Body content for the pull request
+            branch_name: Branch name for the PR
+            
+        Returns:
+            str: PR number
+        """
+        # Create branch and changes in fork
+        self.create_branch(fork_repo_path, branch_name)
+        
+        # Make some changes to trigger workflows
+        test_file = fork_repo_path / "test_changes.md"
+        test_file.write_text(f"# Test changes for {pr_title}\n\nTimestamp: {time.time()}")
+        
+        self.git_commit_and_push(
+            fork_repo_path, 
+            f"Add test changes for {pr_title}",
+            ["test_changes.md"]
+        )
+        
+        # Create PR from fork to organization repo
+        # Note: This requires the fork to have the org repo as upstream
+        fork_owner = self.config.fork_repo.owner
+        org_owner = self.config.primary_repo.owner
+        org_repo = self.config.primary_repo.repo
+        
+        pr_result = subprocess.run(
             [
-                "git",
-                "clone",
-                "https://github.com/thenets/repo-automations.git",
-                str(repo_path),
+                "gh",
+                "pr",
+                "create",
+                "--repo", f"{org_owner}/{org_repo}",
+                "--title", pr_title,
+                "--body", pr_body,
+                "--head", f"{fork_owner}:{branch_name}",
+                "--base", "main",
             ],
+            cwd=fork_repo_path,
+            capture_output=True,
+            text=True,
             check=True,
         )
 
-        # Ensure we're on main branch
-        subprocess.run(["git", "checkout", "main"], cwd=repo_path, check=True)
+        # Extract PR number from output
+        pr_url = pr_result.stdout.strip()
+        return pr_url.split("/")[-1]
 
-        # Pull latest changes
-        subprocess.run(["git", "pull", "origin", "main"], cwd=repo_path, check=True)
+    def get_repository_context(self, repo_path: Path) -> Dict[str, str]:
+        """Get repository context information for testing.
+        
+        Args:
+            repo_path: Path to the repository
+            
+        Returns:
+            Dict[str, str]: Repository context with owner, repo, full_name
+        """
+        # Get remote origin URL to determine repository context
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        
+        # Parse GitHub URL to extract owner and repo
+        remote_url = result.stdout.strip()
+        if "github.com" in remote_url:
+            # Handle both SSH and HTTPS URLs
+            if remote_url.startswith("git@github.com:"):
+                repo_part = remote_url.replace("git@github.com:", "").replace(".git", "")
+            else:
+                repo_part = remote_url.replace("https://github.com/", "").replace(".git", "")
+            
+            owner, repo = repo_part.split("/", 1)
+            return {
+                "owner": owner,
+                "repo": repo,
+                "full_name": f"{owner}/{repo}"
+            }
+        
+        return {"owner": "unknown", "repo": "unknown", "full_name": "unknown/unknown"}
 
-        return repo_path
+    def validate_token_permissions(self, repo_path: Path) -> Dict[str, bool]:
+        """Validate GitHub token permissions for the repository.
+        
+        Args:
+            repo_path: Path to the repository
+            
+        Returns:
+            Dict[str, bool]: Permission validation results
+        """
+        permissions = {
+            "issues_read": False,
+            "issues_write": False,
+            "pull_requests_read": False,
+            "pull_requests_write": False,
+            "metadata_read": False
+        }
+        
+        try:
+            # Test issues read permission
+            subprocess.run(
+                ["gh", "issue", "list", "--limit", "1"],
+                cwd=repo_path,
+                capture_output=True,
+                check=True
+            )
+            permissions["issues_read"] = True
+        except subprocess.CalledProcessError:
+            pass
+        
+        try:
+            # Test pull requests read permission
+            subprocess.run(
+                ["gh", "pr", "list", "--limit", "1"],
+                cwd=repo_path,
+                capture_output=True,
+                check=True
+            )
+            permissions["pull_requests_read"] = True
+        except subprocess.CalledProcessError:
+            pass
+        
+        try:
+            # Test metadata read permission (repository info)
+            subprocess.run(
+                ["gh", "repo", "view"],
+                cwd=repo_path,
+                capture_output=True,
+                check=True
+            )
+            permissions["metadata_read"] = True
+        except subprocess.CalledProcessError:
+            pass
+        
+        # Write permissions will be tested by actual operations in tests
+        
+        return permissions
 
     def label_exists(self, repo_path: Path, name: str) -> bool:
         """Check if a label exists in the repository."""
@@ -299,18 +764,21 @@ class GitHubTestManager:
             return False
 
     def poll_until_condition(
-        self, condition_func, timeout: int = 120, poll_interval: int = 5
+        self, condition_func, timeout: Optional[int] = None, poll_interval: Optional[int] = None
     ) -> bool:
         """Poll until a condition is met or timeout is reached.
 
         Args:
             condition_func: A callable that returns True when the condition is met
-            timeout: Maximum time to wait in seconds (default: 120)
-            poll_interval: Time between polls in seconds (default: 5)
+            timeout: Maximum time to wait in seconds (uses config default if None)
+            poll_interval: Time between polls in seconds (uses config default if None)
 
         Returns:
             True if condition was met, False if timeout was reached
         """
+        timeout = timeout or self.config.test_timeout
+        poll_interval = poll_interval or self.config.poll_interval
+        
         start_time = time.time()
 
         while time.time() - start_time < timeout:
@@ -426,7 +894,7 @@ class GitHubTestManager:
 
 
 class GitHubFixtures:
-    """Aggregates all GitHub-related fixtures for testing."""
+    """Aggregates all GitHub-related fixtures for testing with multi-repository support."""
 
     @staticmethod
     def generate_unique_name(prefix: str) -> str:
@@ -445,14 +913,19 @@ class GitHubFixtures:
         return f"{prefix}-{int(timestamp)}-{thread_id}-{process_id}-{random_suffix}"
 
     @pytest.fixture(scope="function")
-    def github_manager(self):
+    def test_config(self):
+        """Get the current test configuration."""
+        return get_test_config()
+
+    @pytest.fixture(scope="function")
+    def github_manager(self, test_config):
         """Create a GitHubTestManager instance for function-scoped tests."""
-        return GitHubTestManager()
+        return GitHubTestManager(config=test_config)
 
     @pytest.fixture(scope="class")
     def github_manager_class(self):
         """Create a GitHubTestManager instance for class-scoped tests."""
-        return GitHubTestManager()
+        return GitHubTestManager(config=get_test_config())
 
     @pytest.fixture(scope="function")
     def cloned_repo(self, github_manager):
@@ -461,29 +934,88 @@ class GitHubFixtures:
 
     @pytest.fixture(scope="class")
     def test_repo(self, github_manager_class):
-        """Create a temporary repository that uses the existing repo-automations as remote."""
+        """Create a temporary repository using the configured primary repository.
+        
+        This fixture reads TEST_GITHUB_ORG and TEST_GITHUB_REPO from .env file,
+        clones the repository, and sets up GitHub Actions secrets.
+        
+        Raises:
+            RepositoryError: If repository doesn't exist or cloning fails
+        """
         # Create unique repository name per thread for parallel execution
         repo_name = self.generate_unique_name("test-repo")
 
-        # Create temporary local repository
-        repo_path = github_manager_class.create_temp_repo(repo_name)
+        try:
+            # Create temporary local repository (this validates and clones the target repo)
+            repo_path = github_manager_class.create_temp_repo(repo_name)
 
-        # Ensure triage label exists (create if it doesn't exist)
-        github_manager_class.create_label(repo_path, "triage", "FFFF00", "Needs triage")
+            # Ensure required labels exist (create if they don't exist)
+            for label_name in github_manager_class.config.required_labels:
+                if label_name == "triage":
+                    github_manager_class.create_label(repo_path, label_name, "FFFF00", "Needs triage")
+                elif label_name == "stale":
+                    github_manager_class.create_label(repo_path, label_name, "CCCCCC", "Stale issue/PR")
+                elif label_name == "ready for review":
+                    github_manager_class.create_label(repo_path, label_name, "00FF00", "Ready for review")
+                elif label_name == "feature-branch":
+                    github_manager_class.create_label(repo_path, label_name, "0000FF", "Feature branch")
+
+            # Create release and backport labels for testing
+            github_manager_class.create_label(
+                repo_path, "release 1.0", "00FF00", "Release 1.0"
+            )
+
+            github_manager_class.create_label(
+                repo_path, "backport main", "0000FF", "Backport to main"
+            )
+
+            yield repo_path
+
+        except Exception as e:
+            # Re-raise with more context
+            if isinstance(e, RepositoryError):
+                raise
+            else:
+                raise RepositoryError(f"Failed to set up test repository: {e}")
+
+        finally:
+            # Cleanup: remove temporary directory
+            subprocess.run(["rm", "-rf", str(repo_path)], check=False)
+
+    @pytest.fixture(scope="class")
+    def org_test_environment(self, github_manager_class):
+        """Create a complete organization + fork test environment.
+        
+        Returns:
+            Tuple[Path, Optional[Path]]: (org_repo_path, fork_repo_path)
+        """
+        org_repo_path, fork_repo_path = github_manager_class.create_organization_test_environment()
+        
+        # Set up required labels in organization repo
+        for label_name in github_manager_class.config.required_labels:
+            if label_name == "triage":
+                github_manager_class.create_label(org_repo_path, label_name, "FFFF00", "Needs triage")
+            elif label_name == "stale":
+                github_manager_class.create_label(org_repo_path, label_name, "CCCCCC", "Stale issue/PR")
+            elif label_name == "ready for review":
+                github_manager_class.create_label(org_repo_path, label_name, "00FF00", "Ready for review")
+            elif label_name == "feature-branch":
+                github_manager_class.create_label(org_repo_path, label_name, "0000FF", "Feature branch")
 
         # Create release and backport labels for testing
         github_manager_class.create_label(
-            repo_path, "release 1.0", "00FF00", "Release 1.0"
+            org_repo_path, "release 1.0", "00FF00", "Release 1.0"
         )
-
         github_manager_class.create_label(
-            repo_path, "backport main", "0000FF", "Backport to main"
+            org_repo_path, "backport main", "0000FF", "Backport to main"
         )
+        
+        yield org_repo_path, fork_repo_path
 
-        yield repo_path
-
-        # Cleanup: remove temporary directory
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
+        # Cleanup: remove temporary directories
+        subprocess.run(["rm", "-rf", str(org_repo_path)], check=False)
+        if fork_repo_path:
+            subprocess.run(["rm", "-rf", str(fork_repo_path)], check=False)
 
     @pytest.fixture(scope="class")
     def integration_manager(self, github_manager_class):

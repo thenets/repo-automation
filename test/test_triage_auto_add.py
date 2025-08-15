@@ -93,6 +93,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
 
+    @pytest.mark.fork_compatibility
     def test_pr_triage_label_auto_add(self, test_repo, integration_manager):
         """Test that a new PR automatically gets the triage label.
 

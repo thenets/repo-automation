@@ -56,6 +56,7 @@ class TestLabelValidation(GitHubFixtures):
         # Cleanup: remove temporary directory
         subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
+    @pytest.mark.fork_compatibility
     def test_workflow_fails_with_invalid_release_label(
         self, test_repo_with_labels, github_manager_class
     ):
