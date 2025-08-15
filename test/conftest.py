@@ -28,30 +28,6 @@ from .test_config import (
 )
 
 
-def pytest_sessionstart(session):
-    """
-    Called after the Session object has been created but before pytest starts collecting tests.
-    
-    This ensures initialization markers are cleaned up before any parallel workers start,
-    preventing race conditions in parallel test execution.
-    """
-    cache_dir = Path("./cache/test/repo")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Force cleanup of initialization markers and lock files
-    complete_file_path = cache_dir / ".initialization_complete"
-    lock_file_path = cache_dir / ".initialization_lock"
-    
-    if complete_file_path.exists():
-        print("🔄 [pytest_sessionstart] Removing initialization completion marker to force repository update...")
-        complete_file_path.unlink()
-    
-    if lock_file_path.exists():
-        print("🧹 [pytest_sessionstart] Cleaning up stale lock file from previous run...")
-        lock_file_path.unlink()
-    
-    print("✅ [pytest_sessionstart] Repository reinitialization setup complete")
-
 
 class RepositoryError(Exception):
     """Exception raised when repository operations fail."""
@@ -211,8 +187,8 @@ class GitHubTestManager:
         Returns:
             str: Generated workflow YAML content
         """
-        # Use local action for testing (./), published action would be thenets/repo-automation@v1
-        action_reference = "./"  # Local action reference for testing
+        # Use the actual action repository for testing since test repo doesn't contain action files
+        action_reference = "thenets/repo-automation@main"  # Reference to the actual action
         
         workflow_content = f"""---
 # Complete Repository Automation - Generated from examples/comprehensive-usage.yml
@@ -242,11 +218,6 @@ jobs:
     if: github.repository == '{repo_config.full_name}'
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{{{ secrets.CUSTOM_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}}}
-        
       - name: Complete Repository Automation
         uses: {action_reference}
         with:
@@ -1269,24 +1240,19 @@ class GitHubFixtures:
         lock_file_path = cache_dir / ".initialization_lock"
         complete_file_path = cache_dir / ".initialization_complete"
         
-        # ALWAYS force re-initialization by removing completion marker
-        # This ensures the test repository is updated with current source code
-        if complete_file_path.exists():
-            print("🔄 Removing existing initialization marker to force repository update...")
-            complete_file_path.unlink()
-        
-        # Clean up any stale lock files from previous runs
-        if lock_file_path.exists():
-            print("🧹 Cleaning up stale lock file from previous run...")
-            lock_file_path.unlink()
-        
         # Try to acquire lock for initialization
         try:
             with open(lock_file_path, 'w') as lock_file:
                 try:
                     # Non-blocking lock attempt
                     fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    print("🔒 Acquired initialization lock - performing repository setup...")
+                    print(f"🔒 [Worker {threading.get_ident()}] Acquired initialization lock - performing repository setup...")
+                    
+                    # ONLY the thread that wins the lock performs cleanup
+                    # This ensures the test repository is updated with current source code
+                    if complete_file_path.exists():
+                        print(f"🔄 [Worker {threading.get_ident()}] Removing existing initialization marker to force repository update...")
+                        complete_file_path.unlink()
                     
                     # This worker will perform the initialization
                     manager = GitHubTestManager(cache_dir=cache_dir, config=config)
@@ -1310,20 +1276,27 @@ class GitHubFixtures:
                         
                 except IOError:
                     # Lock is held by another process - wait for completion
-                    print("⏳ Another worker is initializing repository, waiting...")
+                    print(f"⏳ [Worker {threading.get_ident()}] Another worker is initializing repository, waiting...")
                     
                     # Wait for completion signal with timeout
                     timeout = 300  # 5 minutes
                     start_time = time.time()
+                    poll_interval = 1  # Check every second
                     
                     while not complete_file_path.exists():
-                        if time.time() - start_time > timeout:
+                        elapsed = time.time() - start_time
+                        if elapsed > timeout:
                             raise RepositoryError(
-                                "Timeout waiting for repository initialization by another worker"
+                                f"Timeout waiting for repository initialization by another worker after {elapsed:.1f}s"
                             )
-                        time.sleep(2)
+                        
+                        # Print progress every 10 seconds to show we're still waiting
+                        if int(elapsed) % 10 == 0 and elapsed > 0:
+                            print(f"⏳ [Worker {threading.get_ident()}] Still waiting for initialization... ({elapsed:.0f}s)")
+                        
+                        time.sleep(poll_interval)
                     
-                    print("✅ Repository initialization completed by another worker")
+                    print(f"✅ [Worker {threading.get_ident()}] Repository initialization completed by another worker")
                     
         except Exception as e:
             # Clean up lock file on any error

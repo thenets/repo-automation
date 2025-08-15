@@ -57,6 +57,7 @@ htmlcov/
 coverage.xml
 *.cover
 .hypothesis/
+.coverage*
 
 # Linting
 .ruff_cache/
