@@ -90,24 +90,72 @@ jobs:
               }
             }
 
-      - name: Download event metadata (workflow_run)
-        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
-        uses: actions/download-artifact@v5
-        with:
-          name: event-metadata
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Process pull request events
+      - name: Process pull request events from trigger workflow
         if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
+          github-token: ${{ secrets.GITHUB_TOKEN_AUTOMATION || github.token }}
           script: |
-            // Load event metadata from artifact
-            const fs = require('fs');
-            const eventData = JSON.parse(fs.readFileSync('event-metadata.json', 'utf8'));
-            console.log(`Processing ${eventData.event_type} #${eventData.issue_number} from workflow_run trigger`);
+            // Extract event data directly from workflow_run payload
+            const workflowRun = context.payload.workflow_run;
+            console.log(`Processing workflow_run from: ${workflowRun.name}`);
+            console.log(`Workflow run conclusion: ${workflowRun.conclusion}`);
+            console.log(`Head commit: ${workflowRun.head_commit.message}`);
+            
+            // For PR events, we need to get the PR number from the head branch
+            // The head branch is typically in format: refs/heads/branch-name or branch-name
+            const headBranch = workflowRun.head_branch;
+            console.log(`Head branch: ${headBranch}`);
+            
+            if (!headBranch || headBranch === 'main') {
+              console.log('Skipping: workflow was not triggered by a PR branch');
+              return;
+            }
+            
+            // Find the PR associated with this branch (including recently closed ones)
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${headBranch}`,
+              state: 'all',
+              sort: 'updated',
+              direction: 'desc'
+            });
+            
+            if (prs.length === 0) {
+              console.log(`No PR found for branch ${headBranch}`);
+              return;
+            }
+            
+            const pr = prs[0];
+            console.log(`Found PR #${pr.number}: ${pr.title} (state: ${pr.state})`);
+            
+            // Skip if PR is closed (workflow was triggered after PR was closed)
+            if (pr.state === 'closed') {
+              console.log(`PR #${pr.number} is closed, skipping labeling`);
+              return;
+            }
+            
+            // Create eventData object similar to what the artifact would contain
+            const eventData = {
+              event_type: 'pull_request',
+              issue_number: pr.number,
+              pr_number: pr.number,
+              head_sha: pr.head.sha,
+              body: pr.body || '',
+              title: pr.title,
+              draft: pr.draft,
+              head_repo: pr.head.repo.full_name,
+              base_repo: pr.base.repo.full_name,
+              user: pr.user.login,
+              created_at: pr.created_at,
+              updated_at: pr.updated_at,
+              mergeable: pr.mergeable,
+              state: pr.state,
+              action: 'opened' // Default action for processing
+            };
+            
+            console.log(`Processing PR #${eventData.issue_number} from workflow_run trigger`);
 
             // Handle different event types
             if (eventData.event_type === 'pull_request') {

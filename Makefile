@@ -42,7 +42,7 @@ format: venv ## Format code with ruff
 .PHONY: test
 test: venv ## Run tests (parallel, up to 10 threads) with coverage
 	@echo "Running tests with coverage (parallel, up to 10 threads)..."
-	./venv/bin/pytest -v -n 10 \
+	./venv/bin/python -m pytest -v -n 10 \
 		--cov=. \
 		--cov-report=term-missing \
 		--cov-report=html:htmlcov \
@@ -55,7 +55,7 @@ test: venv ## Run tests (parallel, up to 10 threads) with coverage
 
 .PHONY: test-list
 test-list: venv ## List all tests
-	./venv/bin/pytest --collect-only
+	./venv/bin/python -m pytest --collect-only
 
 .PHONY: _gh_auth_check
 _gh_auth_check: ## Check GitHub CLI authentication status

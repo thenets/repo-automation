@@ -70,11 +70,11 @@ class GitHubTestManager:
             return False
         
         try:
-            # Set GITHUB_TOKEN as a repository secret for workflow testing
-            print(f"Setting up GITHUB_TOKEN secret for {repo_config.full_name}...")
+            # Set GITHUB_TOKEN_AUTOMATION as a repository secret for workflow testing
+            print(f"Setting up GITHUB_TOKEN_AUTOMATION secret for {repo_config.full_name}...")
             result = subprocess.run(
                 [
-                    "gh", "secret", "set", "GITHUB_TOKEN",
+                    "gh", "secret", "set", "GITHUB_TOKEN_AUTOMATION",
                     "--repo", repo_config.full_name,
                     "--body", github_token
                 ],
@@ -83,7 +83,7 @@ class GitHubTestManager:
                 check=True
             )
             
-            print(f"✅ Successfully set GITHUB_TOKEN secret for {repo_config.full_name}")
+            print(f"✅ Successfully set GITHUB_TOKEN_AUTOMATION secret for {repo_config.full_name}")
             return True
             
         except subprocess.CalledProcessError as e:
@@ -194,8 +194,9 @@ class GitHubTestManager:
         try:
             print(f"Initializing test repository {repo_config.full_name} with current source code...")
             
-            # Create a temporary directory for the initialization
-            temp_init_path = self.cache_dir / "temp-init"
+            # Create a unique temporary directory for the initialization to avoid parallel test conflicts
+            import uuid
+            temp_init_path = self.cache_dir / f"temp-init-{uuid.uuid4().hex[:8]}"
             if temp_init_path.exists():
                 subprocess.run(["rm", "-rf", str(temp_init_path)], check=True)
             
@@ -305,8 +306,7 @@ class GitHubTestManager:
             
         except subprocess.CalledProcessError as e:
             # Clean up temp directory on error
-            temp_init_path = self.cache_dir / "temp-init"
-            if temp_init_path.exists():
+            if 'temp_init_path' in locals() and temp_init_path.exists():
                 subprocess.run(["rm", "-rf", str(temp_init_path)], check=False)
                 
             raise RepositoryError(

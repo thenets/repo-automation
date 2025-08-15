@@ -38,43 +38,63 @@ jobs:
     if: github.repository == 'dednets/repo-automation-test' && github.event.workflow_run.conclusion == 'success'
 
     steps:
-      - name: Download event metadata
-        uses: actions/download-artifact@v5
-        with:
-          name: event-metadata
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-
       - name: Parse YAML from PR description and add labels
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN || github.token }}
+          github-token: ${{ secrets.GITHUB_TOKEN_AUTOMATION || github.token }}
           script: |
             try {
-              console.log(`🔍 Processing PR #${context.issue.number}`);
+              console.log(`🔍 Processing workflow_run trigger`);
 
-              // Download and read the event metadata
-              const fs = require('fs');
-              let eventData;
-              let workflowConfig;
-
-              try {
-                const eventMetadata = fs.readFileSync('event-metadata.json', 'utf8');
-                eventData = JSON.parse(eventMetadata);
-                console.log(`📥 Event data loaded: ${eventData.event_type} for #${eventData.issue_number}`);
-              } catch (error) {
-                console.log('❌ No event metadata found, exiting gracefully');
+              // Extract event data directly from workflow_run payload
+              const workflowRun = context.payload.workflow_run;
+              console.log(`Processing workflow_run from: ${workflowRun.name}`);
+              console.log(`Workflow run conclusion: ${workflowRun.conclusion}`);
+              
+              // For PR events, we need to get the PR number from the head branch
+              const headBranch = workflowRun.head_branch;
+              console.log(`Head branch: ${headBranch}`);
+              
+              if (!headBranch || headBranch === 'main') {
+                console.log('Skipping: workflow was not triggered by a PR branch');
                 return;
               }
-
-              try {
-                const configData = fs.readFileSync('workflow-config.json', 'utf8');
-                workflowConfig = JSON.parse(configData);
-                console.log(`📋 Configuration loaded: ${workflowConfig.accepted_releases.length} releases, ${workflowConfig.accepted_backports.length} backports`);
-              } catch (error) {
-                console.log('❌ No workflow configuration found, exiting gracefully');
+              
+              // Find the PR associated with this branch (including recently closed ones)
+              const { data: prs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: `${context.repo.owner}:${headBranch}`,
+                state: 'all',
+                sort: 'updated',
+                direction: 'desc'
+              });
+              
+              if (prs.length === 0) {
+                console.log(`No PR found for branch ${headBranch}`);
                 return;
               }
+              
+              const pr = prs[0];
+              console.log(`Found PR #${pr.number}: ${pr.title} (state: ${pr.state})`);
+              
+              // Skip if PR is closed (workflow was triggered after PR was closed)
+              if (pr.state === 'closed') {
+                console.log(`PR #${pr.number} is closed, skipping labeling`);
+                return;
+              }
+              
+              // Create eventData object
+              const eventData = {
+                event_type: 'pull_request',
+                issue_number: pr.number,
+                head_sha: pr.head.sha,
+                body: pr.body || '',
+                title: pr.title,
+                draft: pr.draft
+              };
+
+              console.log(`🔍 Processing PR #${eventData.issue_number}`);
 
               // Skip if not a pull request event
               if (eventData.event_type !== 'pull_request') {
@@ -88,8 +108,9 @@ jobs:
                 return;
               }
 
-              const acceptedReleases = workflowConfig.accepted_releases;
-              const acceptedBackports = workflowConfig.accepted_backports;
+              // Define accepted releases and backports directly in the workflow
+              const acceptedReleases = ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2", "devel"];
+              const acceptedBackports = ["1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.0", "2.1", "2.2"];
 
               // Create initial check run
               const checkRun = await github.rest.checks.create({
