@@ -1,10 +1,10 @@
 # GitHub Repository Automations
 
-This repository contains GitHub Actions workflows to automate common development tasks for team projects.
+**Complete Repository Automation** is now available as a unified GitHub Action! This project has migrated from individual keeper workflows to a single, powerful action that reduces configuration from ~1,500 lines to just ~20 lines.
 
-## 🚀 GitHub Action Available!
+## 🚀 GitHub Action (Action Mode Only)
 
-**Complete Repository Automation** is now available as a reusable GitHub Action! Instead of copying multiple workflow files (~1,500 lines), you can now use our action directly in your repository with just ~20 lines of configuration.
+This repository now **only supports the Action mode**. All individual keeper workflows have been removed and consolidated into a single, feature-rich GitHub Action.
 
 ### Quick Start
 
@@ -80,7 +80,7 @@ jobs:
 - ✅ **Comprehensive error handling** with check runs and comments
 - ✅ **Dry-run mode** for safe testing
 
-See [examples/comprehensive-usage.yml](examples/comprehensive-usage.yml) for all configuration options.
+📚 **See [examples/comprehensive-usage.yml](examples/comprehensive-usage.yml) for comprehensive configuration examples and migration guides.**
 
 ### Migration Status
 
@@ -100,21 +100,15 @@ See [examples/comprehensive-usage.yml](examples/comprehensive-usage.yml) for all
 
 ## Table of Contents
 
-- [GitHub Action Usage](#github-action-available) ⭐ **Recommended**
-- [Individual Workflows](#features) 📚 **Legacy Documentation**
-  - [1. Keeper: unified triage management](#1-keeper-unified-triage-management) ✅ **Migrated to Action**
-  - [2. Keeper: stale PR detector](#2-keeper-stale-pr-detector) ✅ **Migrated to Action**
-  - [3. Keeper: auto-label release and backport](#3-keeper-auto-label-release-and-backport) ✅ **Migrated to Action**
-  - [4. Keeper: closed PR label cleanup](#4-keeper-closed-pr-label-cleanup) 📝 **Planned**
-  - [5. Keeper: feature branch auto-labeling](#5-keeper-feature-branch-auto-labeling) ✅ **Migrated to Action**
-  - [6. Keeper: enhanced triage label management](#6-keeper-enhanced-triage-label-management) 📝 **Planned**
-- [Workflow Structure](#workflow-structure)
-- [Fork Compatibility](#fork-compatibility)
-- [Prerequisites](#prerequisites)
-- [Usage](#usage)
-- [Testing](#testing)
-- [Development](#development)
-- [License](#license)
+- [🚀 GitHub Action (Action Mode Only)](#-github-action-action-mode-only) ⭐ **Current Mode**
+- [📚 Comprehensive Examples](#-see-examplescomprehensive-usageyml-for-comprehensive-configuration-examples-and-migration-guides) 📖 **Configuration Guide**
+- [🎉 Migration Complete](#-migration-complete---this-repository-as-reference) ✅ **Success Story**
+- [📋 Legacy Documentation](#legacy-documentation-historical-reference) 📚 **Historical Reference**
+- [🔧 Prerequisites](#prerequisites)
+- [🚀 Usage](#usage)
+- [🧪 Testing](#testing)
+- [⚙️ Development](#development)
+- [📄 License](#license)
 
 ## 🎉 Current Workflow Structure (Post-Migration)
 
@@ -159,7 +153,9 @@ To migrate your repository from individual workflows:
 
 ### Legacy Documentation (Historical Reference)
 
-The sections below document the original individual workflows for reference purposes. **These workflows have been removed from this repository** and replaced with the unified action.
+> ⚠️ **Note**: The sections below document the original individual workflows for historical reference only. **These workflows have been removed from this repository** and replaced with the unified GitHub Action. 
+> 
+> For current usage, see the [GitHub Action examples](#-github-action-action-mode-only) and [comprehensive configuration guide](examples/comprehensive-usage.yml).
 
 ## Features
 
