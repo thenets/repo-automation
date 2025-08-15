@@ -20,15 +20,11 @@ class TestLabelValidation(GitHubFixtures):
     """Test label validation logic using real GitHub API calls."""
 
     @pytest.fixture(scope="class")
-    def test_repo_with_labels(self, github_manager_class):
-        """Create a test repository with some labels present and others missing."""
-        # Create unique repository name per thread for parallel execution
-        repo_name = self.generate_unique_name("test-label-validation")
-
-        # Create temporary local repository
-        repo_path = github_manager_class.create_temp_repo(repo_name)
-
-        # Create some valid labels that workflows can use
+    def test_repo_with_labels(self, test_repo, github_manager_class):
+        """Use the standard test repository and ensure required labels exist."""
+        repo_path = test_repo
+        
+        # Create some valid labels that workflows can use (some may already exist)
         github_manager_class.create_label(
             repo_path, "triage", "FFFF00", "Needs triage"
         )
@@ -51,10 +47,7 @@ class TestLabelValidation(GitHubFixtures):
         # - "backport invalid-version"
         # These will be used to test workflow failure scenarios
 
-        yield repo_path
-
-        # Cleanup: remove temporary directory
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
+        return repo_path
 
     @pytest.mark.fork_compatibility
     def test_workflow_fails_with_invalid_release_label(

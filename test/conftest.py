@@ -141,9 +141,6 @@ class GitHubTestManager:
             
             print(f"✅ Successfully cloned {repo_config.full_name}")
             
-            # Set up repository secrets
-            self.setup_repository_secrets(repo_config)
-            
             return clone_path
             
         except subprocess.CalledProcessError as e:
@@ -165,7 +162,20 @@ class GitHubTestManager:
         return self.clone_target_repository(repo_config, target_name)
 
     def clone_current_repo(self, target_name: str = "test-hello-repo") -> Path:
-        """Clone the current git repo to cache directory."""
+        """DEPRECATED: Use test_repo fixture instead.
+        
+        Clone the current git repo to cache directory.
+        
+        WARNING: This method is deprecated. Tests should use the test_repo fixture
+        which provides access to properly initialized external repositories.
+        """
+        import warnings
+        warnings.warn(
+            "clone_current_repo is deprecated. Use the test_repo fixture instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         current_repo = Path.cwd()
         clone_path = self.cache_dir / target_name
 
@@ -391,11 +401,24 @@ jobs:
             )
 
     def create_temp_repo(self, repo_name: str) -> Path:
-        """Create a temporary local repository using the configured primary repository.
+        """DEPRECATED: Use test_repo fixture instead.
+        
+        Create a temporary local repository using the configured primary repository.
+        
+        WARNING: This method is deprecated. All repository initialization should happen
+        through the session-scoped initialize_external_repository fixture. Tests should
+        use the test_repo fixture instead of calling this method directly.
         
         Note: Repository initialization is now handled by the session-scoped fixture,
         so this method only clones the already-initialized external repository.
         """
+        import warnings
+        warnings.warn(
+            "create_temp_repo is deprecated. Use the test_repo fixture instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         repo_path = self.cache_dir / repo_name
 
         # Clean up if exists
@@ -411,7 +434,13 @@ jobs:
         org_repo_path: Path,
         repo_name: str
     ) -> Path:
-        """Create a fork repository for external contributor testing.
+        """DEPRECATED: Fork repositories are now initialized by session fixture.
+        
+        Create a fork repository for external contributor testing.
+        
+        WARNING: This method is deprecated. Fork repository initialization should happen
+        through the session-scoped initialize_external_repository fixture. Use
+        create_organization_test_environment() for org+fork test scenarios.
         
         Args:
             fork_config: Fork repository configuration
@@ -421,6 +450,13 @@ jobs:
         Returns:
             Path: Path to the fork repository
         """
+        import warnings
+        warnings.warn(
+            "create_fork_repo is deprecated. Fork repositories are initialized by session fixture.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         fork_path = self.cache_dir / repo_name
 
         # Clean up if exists
@@ -487,7 +523,10 @@ jobs:
         return success
 
     def create_organization_test_environment(self) -> Tuple[Path, Optional[Path]]:
-        """Create a complete organization + fork test environment.
+        """Create local working copies of the session-initialized repositories.
+        
+        Note: The actual repositories are initialized once per session by initialize_external_repository.
+        This method creates local working copies for tests that need organization + fork scenarios.
         
         Returns:
             Tuple[Path, Optional[Path]]: (org_repo_path, fork_repo_path)
@@ -496,26 +535,29 @@ jobs:
         timestamp = int(time.time())
         thread_id = threading.get_ident()
         
+        # Clone the already-initialized primary repository
         org_repo_name = f"test-org-{timestamp}-{thread_id}"
-        org_repo_path = self.clone_repository(
+        org_repo_path = self.clone_target_repository(
             self.config.primary_repo, 
             org_repo_name
         )
         
-        # Set up workflows for organization repository
-        self.setup_repository_workflows(org_repo_path, self.config.primary_repo)
-        
         fork_repo_path = None
         if self.config.fork_repo:
+            # Clone the already-initialized fork repository
             fork_repo_name = f"test-fork-{timestamp}-{thread_id}"
-            fork_repo_path = self.create_fork_repo(
-                self.config.fork_repo,
-                org_repo_path,
+            fork_repo_path = self.clone_target_repository(
+                self.config.fork_repo, 
                 fork_repo_name
             )
             
-            # Set up workflows for fork repository (using fork's own config)
-            self.setup_repository_workflows(fork_repo_path, self.config.fork_repo)
+            # Add organization repo as upstream remote for fork testing
+            parent_url = f"https://github.com/{self.config.primary_repo.full_name}.git"
+            subprocess.run(
+                ["git", "remote", "add", "upstream", parent_url],
+                cwd=fork_repo_path,
+                check=True
+            )
         
         return org_repo_path, fork_repo_path
 
@@ -1116,10 +1158,6 @@ class GitHubFixtures:
         """Create a GitHubTestManager instance for class-scoped tests."""
         return GitHubTestManager(config=get_test_config())
 
-    @pytest.fixture(scope="function")
-    def cloned_repo(self, github_manager):
-        """Clone the current git repo to cache directory."""
-        return github_manager.clone_current_repo()
 
     @pytest.fixture(scope="class")
     def test_repo(self, github_manager_class, initialize_external_repository):
@@ -1146,8 +1184,11 @@ class GitHubFixtures:
 
         repo_path = None
         try:
-            # Create temporary local repository (external repo is already initialized)
-            repo_path = github_manager_class.create_temp_repo(repo_name)
+            # Clone the already-initialized external repository directly
+            repo_path = github_manager_class.clone_target_repository(
+                github_manager_class.config.primary_repo, 
+                repo_name
+            )
 
             # Ensure required labels exist (create if they don't exist)
             for label_name in github_manager_class.config.required_labels:
@@ -1183,43 +1224,6 @@ class GitHubFixtures:
             if repo_path is not None:
                 subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
-    @pytest.fixture(scope="class")
-    def org_test_environment(self, github_manager_class, initialize_external_repository):
-        """Create a complete organization + fork test environment.
-        
-        This fixture depends on session-scoped initialization to ensure the
-        external repository is properly set up before creating test environments.
-        
-        Returns:
-            Tuple[Path, Optional[Path]]: (org_repo_path, fork_repo_path)
-        """
-        org_repo_path, fork_repo_path = github_manager_class.create_organization_test_environment()
-        
-        # Set up required labels in organization repo
-        for label_name in github_manager_class.config.required_labels:
-            if label_name == "triage":
-                github_manager_class.create_label(org_repo_path, label_name, "FFFF00", "Needs triage")
-            elif label_name == "stale":
-                github_manager_class.create_label(org_repo_path, label_name, "CCCCCC", "Stale issue/PR")
-            elif label_name == "ready for review":
-                github_manager_class.create_label(org_repo_path, label_name, "00FF00", "Ready for review")
-            elif label_name == "feature-branch":
-                github_manager_class.create_label(org_repo_path, label_name, "0000FF", "Feature branch")
-
-        # Create release and backport labels for testing
-        github_manager_class.create_label(
-            org_repo_path, "release 1.0", "00FF00", "Release 1.0"
-        )
-        github_manager_class.create_label(
-            org_repo_path, "backport main", "0000FF", "Backport to main"
-        )
-        
-        yield org_repo_path, fork_repo_path
-
-        # Cleanup: remove temporary directories
-        subprocess.run(["rm", "-rf", str(org_repo_path)], check=False)
-        if fork_repo_path:
-            subprocess.run(["rm", "-rf", str(fork_repo_path)], check=False)
 
     @pytest.fixture(scope="class")
     def integration_manager(self, github_manager_class):
@@ -1261,6 +1265,20 @@ class GitHubFixtures:
                         # Perform the actual initialization
                         success = manager.initialize_test_repository(config.primary_repo)
                         if success:
+                            # Set up repository secrets after successful initialization
+                            manager.setup_repository_secrets(config.primary_repo)
+                            
+                            # Set up organization test environment if fork repo is configured
+                            if config.fork_repo:
+                                print("Setting up organization test environment with fork repository...")
+                                # Initialize fork repository as well
+                                fork_success = manager.initialize_test_repository(config.fork_repo)
+                                if fork_success:
+                                    manager.setup_repository_secrets(config.fork_repo)
+                                    print("✅ Fork repository initialization completed successfully")
+                                else:
+                                    print("⚠️ Fork repository initialization failed, continuing with primary repo only")
+                            
                             # Signal completion to other workers
                             complete_file_path.write_text("initialized")
                             print("✅ External repository initialization completed successfully")

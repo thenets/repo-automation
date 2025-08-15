@@ -17,12 +17,10 @@ class TestBasicFunctionality(GitHubFixtures):
     """Basic functionality tests that don't require GitHub integration."""
 
     @pytest.mark.fork_compatibility
-    def test_hello(self, github_manager):
+    def test_hello(self, test_repo, github_manager):
         """Test basic functionality of the GitHubTestManager class."""
-        # Create a temporary repository using the existing repo-automations as remote
-        # Generate thread-safe unique repo name for parallel execution
-        repo_name = self.generate_unique_name("test-hello")
-        repo_path = github_manager.create_temp_repo(repo_name)
+        # Use the session-initialized test repository
+        repo_path = test_repo
 
         # Verify the repository was created and exists
         assert repo_path.exists()
