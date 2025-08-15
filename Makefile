@@ -251,11 +251,11 @@ debug-clean-prs-and-branches: _gh_auth_check_env ## Close all PRs and delete bra
 		export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
 		echo "Closing all open PRs..." && \
 		gh pr list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --state open --limit 1000 --json number --jq '.[].number' | \
-		xargs -I {} sh -c 'echo "Closing PR #{}..." && gh pr close {} --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO"' && \
+		xargs -I {} sh -c 'echo "Closing PR #{}..." && gh pr close {} --repo "'$$TEST_GITHUB_ORG'/'$$TEST_GITHUB_REPO'"' && \
 		echo "Deleting all non-main branches..." && \
 		gh api repos/"$$TEST_GITHUB_ORG"/"$$TEST_GITHUB_REPO"/git/refs/heads | \
 		jq -r '.[] | select(.ref != "refs/heads/main") | .ref | sub("refs/heads/"; "")' | \
-		xargs -I {} sh -c 'echo "Deleting branch {}..." && gh api -X DELETE repos/"$$TEST_GITHUB_ORG"/"$$TEST_GITHUB_REPO"/git/refs/heads/{}' && \
+		xargs -I {} sh -c 'echo "Deleting branch {}..." && gh api -X DELETE repos/"'$$TEST_GITHUB_ORG'"/"'$$TEST_GITHUB_REPO'"/git/refs/heads/{}' && \
 		echo "✅ Cleanup completed!"; \
 	else \
 		echo "Operation cancelled."; \
