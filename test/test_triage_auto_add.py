@@ -467,9 +467,9 @@ class TestStalePRDetector(GitHubFixtures):
 
         assert label_added, f"Triage label was not added to PR #{pr_number}"
 
-        # Manually trigger the stale PR detector workflow
+        # Manually trigger the repository automation workflow for stale detection
         subprocess.run(
-            ["gh", "workflow", "run", "keeper-stale-pr-detector.yml"],
+            ["gh", "workflow", "run", "repository-automation.yml"],
             cwd=repo_path,
             check=True,
         )
@@ -515,7 +515,7 @@ class TestStalePRDetector(GitHubFixtures):
 
         # Test manual workflow trigger
         result = subprocess.run(
-            ["gh", "workflow", "run", "keeper-stale-pr-detector.yml"],
+            ["gh", "workflow", "run", "repository-automation.yml"],
             cwd=repo_path,
             check=True,
             capture_output=True,

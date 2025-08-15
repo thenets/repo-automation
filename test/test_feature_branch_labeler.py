@@ -732,7 +732,7 @@ The value above is not in the accepted list and should create a validation error
         assert "Invalid needs_feature_branch value: \"maybe_invalid_value\"" in error_comment, "Error comment should mention invalid value"
         assert "How to fix:" in error_comment, "Error comment should provide fix instructions"
         assert "Valid YAML format:" in error_comment, "Error comment should provide example YAML"
-        assert "keeper-feature-branch-auto-labeling workflow" in error_comment, "Error comment should mention the workflow"
+        assert "This comment was posted by the repository automation workflow." in error_comment, "Error comment should mention the workflow"
 
         # Update PR description with valid YAML
         valid_pr_body = """This PR tests that validation error comments are auto-deleted when YAML is fixed.
