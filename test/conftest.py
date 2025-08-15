@@ -239,7 +239,7 @@ jobs:
           
           # Release/backport labeling configuration (enables auto-labeling)
           accepted-releases: '["1.0", "1.1", "1.2", "2.0", "2.1", "devel"]'
-          accepted-backports: '["1.0", "1.1", "1.2", "2.0", "2.1"]'
+          accepted-backports: '["1.0", "1.1", "1.2", "2.0", "2.1", "2.2"]'
           
           # Feature branch automation (enables feature branch labeling)
           enable-feature-branch: true

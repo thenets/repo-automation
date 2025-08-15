@@ -37,10 +37,10 @@ class TestReleaseBackportLabeler(GitHubFixtures):
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release 1.5", "00FF00", "Release 1.5"
+            repo_path, "release 2.0", "00FF00", "Release 2.0"
         )
         integration_manager.create_label(
-            repo_path, "backport 1.4", "0000FF", "Backport to 1.4"
+            repo_path, "backport 1.2", "0000FF", "Backport to 1.2"
         )
 
         # Create a new branch
@@ -65,8 +65,8 @@ This file contains a simple change for testing PR labeling.
         pr_body = """This PR tests automatic labeling based on YAML code blocks in the PR description.
 
 ```yaml
-release: 1.5
-backport: 1.4
+release: 2.0
+backport: 1.2
 ```
 
 The changes are backward compatible."""
@@ -81,7 +81,7 @@ The changes are backward compatible."""
         # Wait for labels to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.5"
+                repo_path, pr_number, "release 2.0"
             ),
             timeout=120,
             poll_interval=5,
@@ -89,7 +89,7 @@ The changes are backward compatible."""
 
         backport_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 1.4"
+                repo_path, pr_number, "backport 1.2"
             ),
             timeout=120,
             poll_interval=5,
@@ -100,11 +100,11 @@ The changes are backward compatible."""
 
         # Verify the labels are indeed present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 1.5" in labels, (
-            f"Expected 'release 1.5' label on PR #{pr_number}, but got: {labels}"
+        assert "release 2.0" in labels, (
+            f"Expected 'release 2.0' label on PR #{pr_number}, but got: {labels}"
         )
-        assert "backport 1.4" in labels, (
-            f"Expected 'backport 1.4' label on PR #{pr_number}, but got: {labels}"
+        assert "backport 1.2" in labels, (
+            f"Expected 'backport 1.2' label on PR #{pr_number}, but got: {labels}"
         )
 
         # Cleanup PR
@@ -129,7 +129,7 @@ The changes are backward compatible."""
             repo_path, "release devel", "FF0000", "Release devel"
         )
         integration_manager.create_label(
-            repo_path, "backport 1.5", "00FFFF", "Backport to 1.5"
+            repo_path, "backport 2.1", "00FFFF", "Backport to 2.1"
         )
 
         # Create a new branch
@@ -155,7 +155,7 @@ This file contains changes for development release.
 
 ```yaml
 release: devel
-backport: 1.5
+backport: 2.1
 ```
 
 These changes are for the development branch."""
@@ -178,7 +178,7 @@ These changes are for the development branch."""
 
         backport_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 1.5"
+                repo_path, pr_number, "backport 2.1"
             ),
             timeout=120,
             poll_interval=5,
@@ -192,8 +192,8 @@ These changes are for the development branch."""
         assert "release devel" in labels, (
             f"Expected 'release devel' label on PR #{pr_number}, but got: {labels}"
         )
-        assert "backport 1.5" in labels, (
-            f"Expected 'backport 1.5' label on PR #{pr_number}, but got: {labels}"
+        assert "backport 2.1" in labels, (
+            f"Expected 'backport 2.1' label on PR #{pr_number}, but got: {labels}"
         )
 
         # Cleanup PR
@@ -370,7 +370,7 @@ backport: 1.1#another comment
 
         # Ensure required label exists
         integration_manager.create_label(
-            repo_path, "release 1.4", "FFFF00", "Release 1.4"
+            repo_path, "release 1.2", "FFFF00", "Release 1.2"
         )
 
         # Create a new branch
@@ -395,7 +395,7 @@ This file contains changes for release only.
         pr_body = """This PR tests automatic labeling with only release information.
 
 ```yaml
-release: 1.4
+release: 1.2
 ```
 
 No backport is needed for this change."""
@@ -410,7 +410,7 @@ No backport is needed for this change."""
         # Wait for release label to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.4"
+                repo_path, pr_number, "release 1.2"
             ),
             timeout=120,
             poll_interval=5,
@@ -420,8 +420,8 @@ No backport is needed for this change."""
 
         # Verify the labels
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 1.4" in labels, (
-            f"Expected 'release 1.4' label on PR #{pr_number}, but got: {labels}"
+        assert "release 1.2" in labels, (
+            f"Expected 'release 1.2' label on PR #{pr_number}, but got: {labels}"
         )
 
         # Verify no backport labels are present
@@ -685,8 +685,8 @@ The tags above are not in the accepted lists and should create a validation erro
         valid_pr_body = """This PR tests that validation error comments are auto-deleted when YAML is fixed.
 
 ```yaml
-release: 1.5  # Valid release version
-backport: 1.4  # Valid backport target
+release: 1.0  # Valid release version
+backport: 1.1  # Valid backport target
 ```
 
 The tags above are now valid and should cause the error comment to be automatically deleted."""
@@ -714,8 +714,8 @@ The tags above are now valid and should cause the error comment to be automatica
         final_release_labels = [label for label in final_labels if label.startswith("release")]
         final_backport_labels = [label for label in final_labels if label.startswith("backport")]
 
-        assert "release 1.5" in final_labels, f"Expected 'release 1.5' label to be added, but found: {final_labels}"
-        assert "backport 1.4" in final_labels, f"Expected 'backport 1.4' label to be added, but found: {final_labels}"
+        assert "release 1.0" in final_labels, f"Expected 'release 1.0' label to be added, but found: {final_labels}"
+        assert "backport 1.1" in final_labels, f"Expected 'backport 1.1' label to be added, but found: {final_labels}"
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)

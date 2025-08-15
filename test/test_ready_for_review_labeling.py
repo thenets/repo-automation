@@ -89,7 +89,7 @@ Will be updated later to add release information."""
         updated_pr_body = """This PR adds new functionality.
 
 ```yaml
-release: 1.5
+release: 2.0
 ```
 
 Now has release information, so should get ready for review label."""
@@ -103,13 +103,13 @@ Now has release information, so should get ready for review label."""
 
         # Ensure required release label exists
         integration_manager.create_label(
-            repo_path, "release 1.5", "00FF00", "Release 1.5"
+            repo_path, "release 2.0", "00FF00", "Release 2.0"
         )
 
         # Wait for release label to be added after PR description update
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.5"
+                repo_path, pr_number, "release 2.0"
             ),
             timeout=120,
             poll_interval=10,
@@ -133,7 +133,7 @@ Now has release information, so should get ready for review label."""
 
         # Verify final state: should have release label and ready for review label
         final_labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 1.5" in final_labels, f"Release label should be present: {final_labels}"
+        assert "release 2.0" in final_labels, f"Release label should be present: {final_labels}"
         assert "ready for review" in final_labels, f"Ready for review label should be present: {final_labels}"
         assert "triage" not in final_labels, f"Triage label should not be present: {final_labels}"
 
