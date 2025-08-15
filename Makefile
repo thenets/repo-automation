@@ -99,11 +99,13 @@ setup-token: _gh_auth_check ## Generate GitHub token and create .env file for te
 	echo "   - Pull requests: Read and write (required for PR labeling)" && \
 	echo "   - Metadata: Read (required for repository access)" && \
 	echo "   - Administration: Read (optional, for advanced repository management)" && \
+	echo "📋 IMPORTANT: Also enable these account permissions:" && \
+	echo "   - Workflow: Write (REQUIRED for pushing .github/workflows/ files)" && \
 	echo "5. Click 'Generate token' and copy the token" && \
 	echo "" && \
 	echo "⚠️  IMPORTANT: If you get 'workflow scope' errors later:" && \
-	echo "   - Ensure 'Actions: Read and write' permission is granted" && \
-	echo "   - Some repositories may require classic tokens instead of fine-grained" && \
+	echo "   - Ensure 'Workflow: Write' account permission is enabled" && \
+	echo "   - Ensure 'Actions: Read and write' repository permission is granted" && \
 	echo "   - For classic tokens, enable 'workflow' scope explicitly" && \
 	echo "" && \
 	read -p "Enter your GitHub token: " GITHUB_TOKEN && \

@@ -120,10 +120,19 @@ class GitHubTestManager:
             subprocess.run(["rm", "-rf", str(clone_path)], check=True)
 
         try:
+            # Get GITHUB_TOKEN for authenticated clone
+            github_token = os.getenv("GITHUB_TOKEN")
+            if github_token:
+                # Use authenticated URL if token is available
+                clone_url = f"https://{github_token}@github.com/{repo_config.full_name}.git"
+            else:
+                # Fallback to public URL
+                clone_url = repo_config.github_url
+            
             # Clone the repository
             print(f"Cloning {repo_config.full_name} to {clone_path}...")
             subprocess.run(
-                ["git", "clone", repo_config.github_url, str(clone_path)], 
+                ["git", "clone", clone_url, str(clone_path)], 
                 check=True,
                 capture_output=True
             )
@@ -190,24 +199,60 @@ class GitHubTestManager:
             if temp_init_path.exists():
                 subprocess.run(["rm", "-rf", str(temp_init_path)], check=True)
             
-            # Clone current working directory to temp location
+            # Create fresh repository without git history to avoid workflow permissions issues
             current_repo = Path.cwd()
-            subprocess.run(
-                ["git", "clone", str(current_repo), str(temp_init_path)], 
-                check=True,
-                capture_output=True
-            )
+            temp_init_path.mkdir(parents=True)
             
-            # Update remote to point to test repository
-            test_repo_url = f"https://github.com/{repo_config.full_name}.git"
+            # Initialize new git repository with main branch
+            subprocess.run(["git", "init", "-b", "main"], cwd=temp_init_path, check=True)
+            subprocess.run(["git", "config", "user.name", "Test Bot"], cwd=temp_init_path, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=temp_init_path, check=True)
+            
+            # Copy only essential automation files
+            import shutil
+            
+            # Copy TESTING.md for PR modification tests
+            testing_file = current_repo / "TESTING.md"
+            if testing_file.exists():
+                shutil.copy2(testing_file, temp_init_path / "TESTING.md")
+                print(f"Copied TESTING.md for PR testing")
+            
+            # Prepare keeper workflow files for deployment (kept outside git initially)
+            workflows_source = current_repo / ".github" / "workflows"
+            workflows_staging = temp_init_path / "_workflows_staging"
+            
+            if workflows_source.exists():
+                # Create staging directory for workflows (not committed to git)
+                workflows_staging.mkdir(parents=True)
+                
+                # Copy only keeper-*.yml files
+                keeper_files = list(workflows_source.glob("keeper-*.yml"))
+                for workflow_file in keeper_files:
+                    shutil.copy2(workflow_file, workflows_staging / workflow_file.name)
+                
+                print(f"Staged {len(keeper_files)} keeper workflow files for deployment")
+            else:
+                print("⚠️ No .github/workflows directory found")
+            
+            # Get GITHUB_TOKEN for authenticated push
+            github_token = os.getenv("GITHUB_TOKEN")
+            if not github_token:
+                raise RepositoryError("GITHUB_TOKEN environment variable is required for repository initialization")
+            
+            # Add and commit only TESTING.md file (workflows staged separately)
+            subprocess.run(["git", "add", "TESTING.md"], cwd=temp_init_path, check=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit - testing file"], cwd=temp_init_path, check=True)
+            
+            # Add remote pointing to test repository with token authentication
+            test_repo_url = f"https://{github_token}@github.com/{repo_config.full_name}.git"
             subprocess.run(
-                ["git", "remote", "set-url", "origin", test_repo_url],
+                ["git", "remote", "add", "origin", test_repo_url],
                 cwd=temp_init_path,
                 check=True
             )
             
-            # Force push current main branch to test repository
-            print(f"Force-pushing current source to {repo_config.full_name}...")
+            # Force push testing files to test repository
+            print(f"Force-pushing testing files to {repo_config.full_name}...")
             result = subprocess.run(
                 ["git", "push", "-f", "origin", "main"],
                 cwd=temp_init_path,
@@ -218,25 +263,39 @@ class GitHubTestManager:
             if result.returncode != 0:
                 print(f"Git push stderr: {result.stderr}")
                 print(f"Git push stdout: {result.stdout}")
-                
-                # Check for workflow scope error and provide helpful message
-                if "without `workflow` scope" in result.stderr:
-                    print("\n❌ GitHub token is missing 'workflow' scope!")
-                    print("💡 To fix this:")
-                    print("   1. Go to: https://github.com/settings/personal-access-tokens/new")
-                    print("   2. Select 'Fine-grained personal access token'")
-                    print(f"   3. Choose 'Selected repositories' and select: {repo_config.full_name}")
-                    print("   4. Grant these repository permissions:")
-                    print("      - Actions: Read and write (required for workflow files)")
-                    print("      - Contents: Read and write (required for code and workflow files)") 
-                    print("      - Issues: Read and write (required for issue labeling)")
-                    print("      - Pull requests: Read and write (required for PR labeling)")
-                    print("      - Metadata: Read (required for repository access)")
-                    print("      - Administration: Read (optional, for advanced repository management)")
-                    print("   5. Update GITHUB_TOKEN in your .env file")
-                    print("")
-                
                 raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+            
+            # Now deploy keeper workflows to .github/workflows directory
+            workflows_staging = temp_init_path / "_workflows_staging"
+            if workflows_staging.exists():
+                # Create .github/workflows directory
+                github_dir = temp_init_path / ".github"
+                workflows_dir = github_dir / "workflows" 
+                workflows_dir.mkdir(parents=True)
+                
+                # Copy workflow files to .github/workflows
+                for workflow_file in workflows_staging.glob("*.yml"):
+                    shutil.copy2(workflow_file, workflows_dir / workflow_file.name)
+                
+                # Stage and commit .github directory
+                subprocess.run(["git", "add", ".github/"], cwd=temp_init_path, check=True)
+                subprocess.run(["git", "commit", "-m", "Add keeper workflows"], cwd=temp_init_path, check=True)
+                
+                print(f"Pushing keeper workflows to {repo_config.full_name}...")
+                workflow_result = subprocess.run(
+                    ["git", "push", "origin", "main"],
+                    cwd=temp_init_path,
+                    capture_output=True,
+                    text=True
+                )
+                
+                if workflow_result.returncode != 0:
+                    print(f"❌ Could not push keeper workflows: {workflow_result.stderr}")
+                    print("💡 This might be due to missing 'Workflow: Write' account permission.")
+                    print("   Please check your GitHub token permissions and try again.")
+                    raise RepositoryError(f"Failed to push workflows to {repo_config.full_name}")
+                else:
+                    print(f"✅ Successfully pushed keeper workflows to .github/workflows/")
             
             # Clean up temp directory
             subprocess.run(["rm", "-rf", str(temp_init_path)], check=False)
