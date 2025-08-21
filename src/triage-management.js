@@ -206,6 +206,23 @@ class RepositoryAutomation {
 
     console.log(`🔄 Processing workflow_run from: ${workflowRun.name}`);
     
+    // Try to load metadata from artifact first (new fork-compatible pattern)
+    const metadata = await this.loadMetadataFromArtifact();
+    
+    if (metadata) {
+      console.log(`📦 Using metadata from artifact: ${metadata.type} #${metadata.number}`);
+      
+      if (metadata.type === 'pull_request') {
+        await this.handlePullRequestEvent(metadata);
+      } else if (metadata.type === 'issue') {
+        await this.handleIssueEventFromMetadata(metadata);
+      }
+      return;
+    }
+    
+    // Fallback to old pattern: find PR by branch
+    console.log('⚠️ No artifact metadata found, falling back to branch-based PR lookup');
+    
     const headBranch = workflowRun.head_branch;
     console.log(`📋 Head branch: ${headBranch}`);
 
@@ -231,6 +248,53 @@ class RepositoryAutomation {
     }
 
     await this.handlePullRequestEvent(pr);
+  }
+
+  /**
+   * Load metadata from artifact (for fork compatibility)
+   */
+  async loadMetadataFromArtifact() {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Check if artifact metadata file exists
+      const metadataPath = path.join('./pr-metadata', 'metadata.json');
+      
+      if (!fs.existsSync(metadataPath)) {
+        console.log('📋 No artifact metadata file found');
+        return null;
+      }
+      
+      // Read and parse metadata
+      const metadataContent = fs.readFileSync(metadataPath, 'utf8');
+      const metadata = JSON.parse(metadataContent);
+      
+      console.log(`📦 Loaded metadata: ${metadata.type} #${metadata.number} by ${metadata.author.login}`);
+      
+      return metadata;
+      
+    } catch (error) {
+      console.log(`⚠️ Failed to load artifact metadata: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Handle issue event from metadata
+   */
+  async handleIssueEventFromMetadata(metadata) {
+    // Convert metadata to issue-like object for compatibility
+    const issueData = {
+      number: metadata.number,
+      title: metadata.title,
+      body: metadata.body,
+      state: metadata.state,
+      labels: metadata.labels,
+      user: metadata.author
+    };
+    
+    await this.addTriageLabel(issueData.number, 'issue');
   }
 
   /**
