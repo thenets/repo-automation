@@ -112,6 +112,73 @@ def validate_repository_exists(owner: str, repo: str) -> bool:
         return False
 
 
+def validate_fork_relationship(fork_owner: str, fork_repo: str, parent_owner: str, parent_repo: str) -> bool:
+    """Validate that a repository is a fork of another repository.
+    
+    Args:
+        fork_owner: Fork repository owner
+        fork_repo: Fork repository name
+        parent_owner: Parent repository owner
+        parent_repo: Parent repository name
+        
+    Returns:
+        bool: True if fork_repo is a fork of parent_repo
+    """
+    try:
+        # Get repository information including parent
+        result = subprocess.run(
+            ["gh", "api", f"repos/{fork_owner}/{fork_repo}", "--jq", ".parent.full_name"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        parent_full_name = result.stdout.strip()
+        expected_parent = f"{parent_owner}/{parent_repo}"
+        
+        return parent_full_name == expected_parent
+        
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def get_repository_fork_info(owner: str, repo: str) -> Optional[Dict[str, str]]:
+    """Get fork information for a repository.
+    
+    Args:
+        owner: Repository owner
+        repo: Repository name
+        
+    Returns:
+        Optional[Dict[str, str]]: Fork information or None if not a fork
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "api", f"repos/{owner}/{repo}", "--jq", ".parent // null"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        output = result.stdout.strip()
+        if output == "null":
+            return None
+            
+        # Get detailed parent information
+        parent_result = subprocess.run(
+            ["gh", "api", f"repos/{owner}/{repo}", "--jq", ".parent | {full_name, owner: .owner.login, name}"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        import json
+        return json.loads(parent_result.stdout)
+        
+    except (subprocess.CalledProcessError, FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
 def validate_workflow_repository_references(
     workflow_dir: Path,
     expected_owner: str,
@@ -321,14 +388,28 @@ class TestConfigManager:
             # Validate fork repository exists
             print(f"Validating fork repository {fork_owner}/{fork_repo_name}...")
             if validate_repository_exists(fork_owner, fork_repo_name):
-                fork_config = RepositoryConfig(
-                    owner=fork_owner,
-                    repo=fork_repo_name,
-                    is_organization=False,
-                    is_fork=True,
-                    fork_parent=primary_config.full_name
-                )
-                print(f"✅ Fork repository {fork_owner}/{fork_repo_name} validated successfully")
+                # Validate fork relationship
+                if validate_fork_relationship(fork_owner, fork_repo_name, primary_owner, primary_repo):
+                    fork_config = RepositoryConfig(
+                        owner=fork_owner,
+                        repo=fork_repo_name,
+                        is_organization=False,
+                        is_fork=True,
+                        fork_parent=primary_config.full_name
+                    )
+                    print(f"✅ Fork repository {fork_owner}/{fork_repo_name} validated successfully")
+                    print(f"✅ Fork relationship confirmed: {fork_owner}/{fork_repo_name} is a fork of {primary_owner}/{primary_repo}")
+                else:
+                    print(f"⚠️ Fork repository {fork_owner}/{fork_repo_name} is not a fork of {primary_owner}/{primary_repo}")
+                    print(f"💡 Please ensure {fork_owner}/{fork_repo_name} is a proper fork of the main repository")
+                    print("💡 Fork-based tests will be skipped")
+                    
+                    # Get fork info for debugging
+                    fork_info = get_repository_fork_info(fork_owner, fork_repo_name)
+                    if fork_info:
+                        print(f"💡 Current parent: {fork_info.get('full_name', 'unknown')}")
+                    else:
+                        print(f"💡 Repository {fork_owner}/{fork_repo_name} is not a fork of any repository")
             else:
                 print(f"⚠️ Fork repository {fork_owner}/{fork_repo_name} not found or not accessible")
                 print("💡 Fork-based tests will be skipped")

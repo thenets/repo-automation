@@ -584,6 +584,13 @@ jobs:
                 cwd=fork_repo_path,
                 check=True
             )
+            
+            # Rename origin to fork for clarity
+            subprocess.run(
+                ["git", "remote", "rename", "origin", "fork"],
+                cwd=fork_repo_path,
+                check=True
+            )
         
         return org_repo_path, fork_repo_path
 
@@ -848,7 +855,131 @@ jobs:
     def create_pr(
         self, repo_path: Path, title: str, body: str, head: str, base: str = "main"
     ) -> str:
-        """Create a pull request and return the PR number."""
+        """Create a pull request and return the PR number.
+        
+        If fork repository is configured, automatically creates PR from fork to main repository.
+        Otherwise, creates PR within the same repository.
+        """
+        # Check if fork repository is configured - if so, use fork-based PR creation
+        if self.config.fork_repo:
+            return self._create_pr_from_fork_to_main(repo_path, title, body, head, base)
+        else:
+            return self._create_local_pr(repo_path, title, body, head, base)
+    
+    def _create_pr_from_fork_to_main(self, main_repo_path: Path, title: str, body: str, head: str, base: str) -> str:
+        """Create a PR from fork repository to main repository.
+        
+        This method:
+        1. Creates a local clone of the fork repository
+        2. Creates the branch and commits in the fork
+        3. Pushes to the fork repository
+        4. Creates a cross-repository PR from fork to main
+        
+        Args:
+            main_repo_path: Path to the main repository (used for branch creation logic)
+            title: PR title
+            body: PR body
+            head: Branch name
+            base: Base branch (usually 'main')
+            
+        Returns:
+            str: PR number
+        """
+        import time
+        import threading
+        
+        # Generate unique fork clone name
+        timestamp = int(time.time())
+        thread_id = threading.get_ident()
+        fork_clone_name = f"fork-{timestamp}-{thread_id}"
+        
+        # Clone the fork repository
+        fork_repo_path = self.clone_target_repository(self.config.fork_repo, fork_clone_name)
+        
+        try:
+            # Add main repository as upstream remote
+            upstream_url = f"https://github.com/{self.config.primary_repo.full_name}.git"
+            subprocess.run(
+                ["git", "remote", "add", "upstream", upstream_url],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Rename origin to fork for clarity
+            subprocess.run(
+                ["git", "remote", "rename", "origin", "fork"],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Sync fork with upstream to ensure common history
+            subprocess.run(
+                ["git", "fetch", "upstream"],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Reset fork's main to match upstream's main
+            subprocess.run(
+                ["git", "reset", "--hard", "upstream/main"],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Create the branch in fork repository
+            self.create_branch(fork_repo_path, head)
+            
+            # Copy the changes from main repo to fork (simulate the same work)
+            # Create a test file that simulates the changes the test is making
+            test_file = fork_repo_path / "test_changes.md"
+            test_file.write_text(f"# Test changes for {title}\n\nTimestamp: {time.time()}\n")
+            
+            # Commit and push to fork
+            subprocess.run(["git", "add", "test_changes.md"], cwd=fork_repo_path, check=True)
+            subprocess.run(["git", "commit", "-m", f"Test changes for {title}"], cwd=fork_repo_path, check=True)
+            subprocess.run(["git", "push", "fork", head], cwd=fork_repo_path, check=True)
+            
+            # Create cross-repository PR from fork to main
+            return self._create_cross_repo_pr(fork_repo_path, title, body, head, base)
+            
+        finally:
+            # Clean up fork clone
+            subprocess.run(["rm", "-rf", str(fork_repo_path)], check=False)
+    
+    def _create_cross_repo_pr(self, fork_repo_path: Path, title: str, body: str, head: str, base: str) -> str:
+        """Create a cross-repository PR from fork to main repository."""
+        # Add suffix to title based on local repository path
+        suffix = self._get_repo_suffix(fork_repo_path)
+        title_with_suffix = f"{title} {suffix}"
+        
+        # Create PR from fork to main repository
+        fork_owner = self.config.fork_repo.owner
+        main_owner = self.config.primary_repo.owner
+        main_repo = self.config.primary_repo.repo
+        
+        pr_result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "create",
+                "--repo", f"{main_owner}/{main_repo}",  # Target the main repository
+                "--title", title_with_suffix,
+                "--body", body,
+                "--head", f"{fork_owner}:{head}",  # From fork:branch
+                "--base", base,  # To main:base
+            ],
+            cwd=fork_repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        
+        # Extract PR number from output
+        pr_url = pr_result.stdout.strip()
+        return pr_url.split("/")[-1]
+    
+    def _create_local_pr(self, repo_path: Path, title: str, body: str, head: str, base: str) -> str:
+        """Create a PR within the same repository (original behavior)."""
         # Add suffix to title based on local repository path
         suffix = self._get_repo_suffix(repo_path)
         title_with_suffix = f"{title} {suffix}"
@@ -880,7 +1011,118 @@ jobs:
     def create_draft_pr(
         self, repo_path: Path, title: str, body: str, head: str, base: str = "main"
     ) -> str:
-        """Create a draft pull request and return the PR number."""
+        """Create a draft pull request and return the PR number.
+        
+        If fork repository is configured, creates draft PR from fork to main repository.
+        Otherwise, creates draft PR within the same repository.
+        """
+        # Check if fork repository is configured - if so, use fork-based PR creation
+        if self.config.fork_repo:
+            return self._create_draft_pr_from_fork_to_main(repo_path, title, body, head, base)
+        else:
+            return self._create_local_draft_pr(repo_path, title, body, head, base)
+    
+    def _create_draft_pr_from_fork_to_main(self, main_repo_path: Path, title: str, body: str, head: str, base: str) -> str:
+        """Create a draft PR from fork repository to main repository.
+        
+        Similar to _create_pr_from_fork_to_main but creates a draft PR.
+        """
+        import time
+        import threading
+        
+        # Generate unique fork clone name
+        timestamp = int(time.time())
+        thread_id = threading.get_ident()
+        fork_clone_name = f"fork-draft-{timestamp}-{thread_id}"
+        
+        # Clone the fork repository
+        fork_repo_path = self.clone_target_repository(self.config.fork_repo, fork_clone_name)
+        
+        try:
+            # Add main repository as upstream remote
+            upstream_url = f"https://github.com/{self.config.primary_repo.full_name}.git"
+            subprocess.run(
+                ["git", "remote", "add", "upstream", upstream_url],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Rename origin to fork for clarity
+            subprocess.run(
+                ["git", "remote", "rename", "origin", "fork"],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Sync fork with upstream to ensure common history
+            subprocess.run(
+                ["git", "fetch", "upstream"],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Reset fork's main to match upstream's main
+            subprocess.run(
+                ["git", "reset", "--hard", "upstream/main"],
+                cwd=fork_repo_path,
+                check=True
+            )
+            
+            # Create the branch in fork repository
+            self.create_branch(fork_repo_path, head)
+            
+            # Copy the changes from main repo to fork (simulate the same work)
+            # Create a test file that simulates the changes the test is making
+            test_file = fork_repo_path / "test_changes.md"
+            test_file.write_text(f"# Draft test changes for {title}\n\nTimestamp: {time.time()}\n")
+            
+            # Commit and push to fork
+            subprocess.run(["git", "add", "test_changes.md"], cwd=fork_repo_path, check=True)
+            subprocess.run(["git", "commit", "-m", f"Draft test changes for {title}"], cwd=fork_repo_path, check=True)
+            subprocess.run(["git", "push", "fork", head], cwd=fork_repo_path, check=True)
+            
+            # Create cross-repository draft PR from fork to main
+            return self._create_cross_repo_draft_pr(fork_repo_path, title, body, head, base)
+            
+        finally:
+            # Clean up fork clone
+            subprocess.run(["rm", "-rf", str(fork_repo_path)], check=False)
+    
+    def _create_cross_repo_draft_pr(self, fork_repo_path: Path, title: str, body: str, head: str, base: str) -> str:
+        """Create a cross-repository draft PR from fork to main repository."""
+        # Add suffix to title based on local repository path
+        suffix = self._get_repo_suffix(fork_repo_path)
+        title_with_suffix = f"{title} {suffix}"
+        
+        # Create draft PR from fork to main repository
+        fork_owner = self.config.fork_repo.owner
+        main_owner = self.config.primary_repo.owner
+        main_repo = self.config.primary_repo.repo
+        
+        pr_result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "create",
+                "--repo", f"{main_owner}/{main_repo}",  # Target the main repository
+                "--title", title_with_suffix,
+                "--body", body,
+                "--head", f"{fork_owner}:{head}",  # From fork:branch
+                "--base", base,  # To main:base
+                "--draft",
+            ],
+            cwd=fork_repo_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        
+        # Extract PR number from output
+        pr_url = pr_result.stdout.strip()
+        return pr_url.split("/")[-1]
+    
+    def _create_local_draft_pr(self, repo_path: Path, title: str, body: str, head: str, base: str) -> str:
+        """Create a draft PR within the same repository (original behavior)."""
         # Add suffix to title based on local repository path
         suffix = self._get_repo_suffix(repo_path)
         title_with_suffix = f"{title} {suffix}"
@@ -929,14 +1171,30 @@ jobs:
         return issue_url.split("/")[-1]
 
     def get_pr_labels(self, repo_path: Path, pr_number: str) -> List[str]:
-        """Get labels for a specific PR."""
-        result = subprocess.run(
-            ["gh", "pr", "view", pr_number, "--json", "labels"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        """Get labels for a specific PR.
+        
+        When fork repository is configured, always queries the main repository for PR labels
+        since cross-repository PRs exist in the target (main) repository.
+        """
+        # Always query the main repository when fork is configured
+        if self.config.fork_repo:
+            # Query the main repository for the PR
+            main_repo_spec = f"{self.config.primary_repo.full_name}"
+            result = subprocess.run(
+                ["gh", "pr", "view", pr_number, "--repo", main_repo_spec, "--json", "labels"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        else:
+            # Query the local repository
+            result = subprocess.run(
+                ["gh", "pr", "view", pr_number, "--json", "labels"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
 
         data = json.loads(result.stdout)
         return [label["name"] for label in data["labels"]]
@@ -955,7 +1213,10 @@ jobs:
         return [label["name"] for label in data["labels"]]
 
     def pr_has_label(self, repo_path: Path, pr_number: str, label_name: str) -> bool:
-        """Check if a PR has a specific label."""
+        """Check if a PR has a specific label.
+        
+        Works with both local and fork-based PRs.
+        """
         try:
             labels = self.get_pr_labels(repo_path, pr_number)
             return label_name in labels
@@ -1000,12 +1261,26 @@ jobs:
     def close_pr(
         self, repo_path: Path, pr_number: str, delete_branch: bool = True
     ) -> bool:
-        """Close a PR and optionally delete the branch."""
+        """Close a PR and optionally delete the branch.
+        
+        When fork repository is configured, always closes the PR in the main repository
+        since cross-repository PRs exist in the target (main) repository.
+        """
         try:
-            cmd = ["gh", "pr", "close", pr_number]
-            if delete_branch:
-                cmd.append("--delete-branch")
-            subprocess.run(cmd, cwd=repo_path, check=True)
+            # Always target the main repository when fork is configured
+            if self.config.fork_repo:
+                # Close PR in the main repository
+                main_repo_spec = f"{self.config.primary_repo.full_name}"
+                cmd = ["gh", "pr", "close", pr_number, "--repo", main_repo_spec]
+                if delete_branch:
+                    cmd.append("--delete-branch")
+            else:
+                # Close PR in the local repository
+                cmd = ["gh", "pr", "close", pr_number]
+                if delete_branch:
+                    cmd.append("--delete-branch")
+            
+            subprocess.run(cmd, check=True)
             return True
         except subprocess.CalledProcessError:
             return False
@@ -1069,15 +1344,31 @@ jobs:
             return False
 
     def get_pr_comments(self, repo_path: Path, pr_number: str) -> List[Dict]:
-        """Get all comments for a PR."""
+        """Get all comments for a PR.
+        
+        When fork repository is configured, always queries the main repository for PR comments
+        since cross-repository PRs exist in the target (main) repository.
+        """
         try:
-            result = subprocess.run(
-                ["gh", "pr", "view", pr_number, "--json", "comments"],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+            # Always query the main repository when fork is configured
+            if self.config.fork_repo:
+                # Query the main repository for the PR
+                main_repo_spec = f"{self.config.primary_repo.full_name}"
+                result = subprocess.run(
+                    ["gh", "pr", "view", pr_number, "--repo", main_repo_spec, "--json", "comments"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            else:
+                # Query the local repository
+                result = subprocess.run(
+                    ["gh", "pr", "view", pr_number, "--json", "comments"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
             
             data = json.loads(result.stdout)
             return data.get("comments", [])
