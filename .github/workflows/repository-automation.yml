@@ -39,16 +39,52 @@ jobs:
   automation:
     runs-on: ubuntu-latest
     
-    # Only run on the main repository and ensure workflow_run succeeded
-    if: >
-      github.repository == 'dednets/repo-automation-test' &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
-    
     steps:
+      - name: Check Repository Context
+        id: check-context
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isMainRepo = context.repo.owner === 'dednets' && context.repo.repo === 'repo-automation-test';
+            const eventType = context.eventName;
+            const isFork = !isMainRepo;
+            
+            console.log(`Repository: ${context.repo.owner}/${context.repo.repo}`);
+            console.log(`Is main repository: ${isMainRepo}`);
+            console.log(`Is fork: ${isFork}`);
+            console.log(`Event: ${eventType}`);
+            
+            if (isFork) {
+              console.log('🔄 Invoked from a fork. This will trigger the main automation later.');
+              await core.summary
+                .addHeading('🔄 Fork Repository Automation')
+                .addRaw('**Status**: Invoked from a fork repository')
+                .addRaw('\n**Action**: This will trigger the main automation workflow in the target repository')
+                .addRaw(`\n**Repository**: \`${context.repo.owner}/${context.repo.repo}\``)
+                .addRaw(`\n**Event**: \`${eventType}\``)
+                .write();
+              
+              core.setOutput('should-run-automation', 'false');
+              core.setOutput('is-fork', 'true');
+            } else {
+              console.log('🎯 Running on main repository, proceeding with automation');
+              core.setOutput('should-run-automation', 'true');
+              core.setOutput('is-fork', 'false');
+            }
+
+      - name: Exit Early (Fork Repository)
+        if: steps.check-context.outputs.is-fork == 'true'
+        run: |
+          echo "🔄 Invoked from a fork. This will trigger the main automation later."
+          echo "✅ Fork workflow completed successfully"
+          exit 0
+
       - name: Checkout Repository
+        if: steps.check-context.outputs.should-run-automation == 'true'
         uses: actions/checkout@v4
 
       - name: Repository Automation
+        if: steps.check-context.outputs.should-run-automation == 'true'
         uses: thenets/repo-automation@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -62,7 +98,7 @@ jobs:
           stale-days: 1
 
       - name: Post Results Summary
-        if: always()
+        if: steps.check-context.outputs.should-run-automation == 'true'
         uses: actions/github-script@v7
         with:
           script: |
