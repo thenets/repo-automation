@@ -81,7 +81,7 @@ jobs:
 
       - name: Checkout Repository
         if: steps.check-context.outputs.should-run-automation == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Repository Automation
         if: steps.check-context.outputs.should-run-automation == 'true'
