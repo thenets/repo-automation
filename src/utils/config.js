@@ -88,19 +88,49 @@ class ConfigManager {
   }
 
   /**
-   * Validate release value against accepted list
+   * Validate release value against accepted list (supports both single values and arrays)
    */
   validateReleaseValue(value) {
     const accepted = this.getAcceptedReleases();
+    
+    if (Array.isArray(value)) {
+      return value.map(v => ({ value: v, valid: accepted.includes(v) }));
+    }
+    
     return accepted.includes(value);
   }
 
   /**
-   * Validate backport value against accepted list
+   * Validate backport value against accepted list (supports both single values and arrays)
    */
   validateBackportValue(value) {
     const accepted = this.getAcceptedBackports();
+    
+    if (Array.isArray(value)) {
+      return value.map(v => ({ value: v, valid: accepted.includes(v) }));
+    }
+    
     return accepted.includes(value);
+  }
+
+  /**
+   * Get invalid values from validation result
+   */
+  getInvalidValues(validationResult) {
+    if (Array.isArray(validationResult)) {
+      return validationResult.filter(item => !item.valid).map(item => item.value);
+    }
+    return [];
+  }
+
+  /**
+   * Get valid values from validation result
+   */
+  getValidValues(validationResult) {
+    if (Array.isArray(validationResult)) {
+      return validationResult.filter(item => item.valid).map(item => item.value);
+    }
+    return validationResult ? [validationResult] : [];
   }
 
   /**
@@ -166,7 +196,7 @@ class ConfigManager {
   }
 
   /**
-   * Parse value from YAML content (handles quotes and comments)
+   * Parse value from YAML content (handles quotes, comments, and arrays)
    */
   parseYamlValue(yamlContent, field) {
     if (!yamlContent) return null;
@@ -176,13 +206,40 @@ class ConfigManager {
     
     if (!match) return null;
     
-    // Clean the value: remove comments, trim, remove quotes
+    // Clean the value: remove comments, trim
     const rawValue = match[1].trim()
       .replace(/#.*$/, '') // Remove comments
-      .trim()
-      .replace(/^["']|["']$/g, ''); // Remove surrounding quotes
+      .trim();
     
-    return rawValue || null;
+    if (!rawValue) return null;
+    
+    // Check if it's an array syntax
+    if (rawValue.startsWith('[') && rawValue.endsWith(']')) {
+      return this.parseYamlArrayValue(rawValue);
+    }
+    
+    // Handle single value - remove quotes
+    return rawValue.replace(/^["']|["']$/g, '') || null;
+  }
+
+  /**
+   * Parse array value from YAML content (handles JSON array syntax)
+   */
+  parseYamlArrayValue(arrayString) {
+    try {
+      // Parse as JSON array
+      const parsed = JSON.parse(arrayString);
+      
+      // Ensure it's an array and contains only strings
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => String(item).trim()).filter(item => item.length > 0);
+      }
+      
+      return null;
+    } catch (error) {
+      // If JSON parsing fails, return null to indicate invalid array format
+      return null;
+    }
   }
 }
 

@@ -145,8 +145,8 @@ class LabelAutomation {
         const releaseResult = await this.processReleaseLabel(yamlContent, hasExistingReleaseLabel);
         if (releaseResult.error) {
           validationErrors.push(releaseResult.error);
-        } else if (releaseResult.label) {
-          labelsToAdd.push(releaseResult.label);
+        } else if (releaseResult.labels && releaseResult.labels.length > 0) {
+          labelsToAdd.push(...releaseResult.labels);
         }
       }
 
@@ -155,8 +155,8 @@ class LabelAutomation {
         const backportResult = await this.processBackportLabel(yamlContent, hasExistingBackportLabel);
         if (backportResult.error) {
           validationErrors.push(backportResult.error);
-        } else if (backportResult.label) {
-          labelsToAdd.push(backportResult.label);
+        } else if (backportResult.labels && backportResult.labels.length > 0) {
+          labelsToAdd.push(...backportResult.labels);
         }
       }
 
@@ -203,57 +203,109 @@ class LabelAutomation {
   }
 
   /**
-   * Process release label from YAML
+   * Process release label from YAML (supports both single values and arrays)
    */
   async processReleaseLabel(yamlContent, hasExistingLabel) {
     const releaseValue = this.config.parseYamlValue(yamlContent, 'release');
     
     if (!releaseValue) {
-      return { label: null, error: null };
+      return { labels: [], error: null };
     }
 
     if (hasExistingLabel) {
-      console.log(`Release label already exists, skipping automatic assignment of "release-${releaseValue}"`);
-      return { label: null, error: null };
+      const displayValue = Array.isArray(releaseValue) ? JSON.stringify(releaseValue) : releaseValue;
+      console.log(`Release label already exists, skipping automatic assignment of "release-${displayValue}"`);
+      return { labels: [], error: null };
     }
 
-    if (this.config.validateReleaseValue(releaseValue)) {
-      console.log(`Found valid release: ${releaseValue}`);
-      return { label: `release-${releaseValue}`, error: null };
+    const validationResult = this.config.validateReleaseValue(releaseValue);
+    
+    if (Array.isArray(releaseValue)) {
+      // Handle array values
+      const invalidValues = this.config.getInvalidValues(validationResult);
+      const validValues = this.config.getValidValues(validationResult);
+      
+      if (invalidValues.length > 0) {
+        const acceptedReleases = this.config.getAcceptedReleases();
+        return { 
+          labels: [], 
+          error: `❌ Invalid release values: ${invalidValues.map(v => `"${v}"`).join(', ')}. Accepted values: ${acceptedReleases.join(', ')}` 
+        };
+      }
+      
+      if (validValues.length > 0) {
+        const labels = validValues.map(v => `release-${v}`);
+        console.log(`Found valid release values: ${validValues.join(', ')}`);
+        return { labels, error: null };
+      }
     } else {
-      const acceptedReleases = this.config.getAcceptedReleases();
-      return { 
-        label: null, 
-        error: `❌ Invalid release value: "${releaseValue}". Accepted values: ${acceptedReleases.join(', ')}` 
-      };
+      // Handle single value (backward compatibility)
+      if (validationResult) {
+        console.log(`Found valid release: ${releaseValue}`);
+        return { labels: [`release-${releaseValue}`], error: null };
+      } else {
+        const acceptedReleases = this.config.getAcceptedReleases();
+        return { 
+          labels: [], 
+          error: `❌ Invalid release value: "${releaseValue}". Accepted values: ${acceptedReleases.join(', ')}` 
+        };
+      }
     }
+    
+    return { labels: [], error: null };
   }
 
   /**
-   * Process backport label from YAML
+   * Process backport label from YAML (supports both single values and arrays)
    */
   async processBackportLabel(yamlContent, hasExistingLabel) {
     const backportValue = this.config.parseYamlValue(yamlContent, 'backport');
     
     if (!backportValue) {
-      return { label: null, error: null };
+      return { labels: [], error: null };
     }
 
     if (hasExistingLabel) {
-      console.log(`Backport label already exists, skipping automatic assignment of "backport-${backportValue}"`);
-      return { label: null, error: null };
+      const displayValue = Array.isArray(backportValue) ? JSON.stringify(backportValue) : backportValue;
+      console.log(`Backport label already exists, skipping automatic assignment of "backport-${displayValue}"`);
+      return { labels: [], error: null };
     }
 
-    if (this.config.validateBackportValue(backportValue)) {
-      console.log(`Found valid backport: ${backportValue}`);
-      return { label: `backport-${backportValue}`, error: null };
+    const validationResult = this.config.validateBackportValue(backportValue);
+    
+    if (Array.isArray(backportValue)) {
+      // Handle array values
+      const invalidValues = this.config.getInvalidValues(validationResult);
+      const validValues = this.config.getValidValues(validationResult);
+      
+      if (invalidValues.length > 0) {
+        const acceptedBackports = this.config.getAcceptedBackports();
+        return { 
+          labels: [], 
+          error: `❌ Invalid backport values: ${invalidValues.map(v => `"${v}"`).join(', ')}. Accepted values: ${acceptedBackports.join(', ')}` 
+        };
+      }
+      
+      if (validValues.length > 0) {
+        const labels = validValues.map(v => `backport-${v}`);
+        console.log(`Found valid backport values: ${validValues.join(', ')}`);
+        return { labels, error: null };
+      }
     } else {
-      const acceptedBackports = this.config.getAcceptedBackports();
-      return { 
-        label: null, 
-        error: `❌ Invalid backport value: "${backportValue}". Accepted values: ${acceptedBackports.join(', ')}` 
-      };
+      // Handle single value (backward compatibility)
+      if (validationResult) {
+        console.log(`Found valid backport: ${backportValue}`);
+        return { labels: [`backport-${backportValue}`], error: null };
+      } else {
+        const acceptedBackports = this.config.getAcceptedBackports();
+        return { 
+          labels: [], 
+          error: `❌ Invalid backport value: "${backportValue}". Accepted values: ${acceptedBackports.join(', ')}` 
+        };
+      }
     }
+    
+    return { labels: [], error: null };
   }
 
   /**
