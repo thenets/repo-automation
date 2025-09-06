@@ -58,7 +58,7 @@ class TestBasicFunctionality(GitHubFixtures):
         print(f"Waiting for triage label to be added to PR #{pr_number}...")
         triage_added = github_manager.poll_until_condition(
             lambda: github_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=30,  # Wait up to 30 seconds
+            timeout=60,  # Wait up to 60 seconds
             poll_interval=5  # Check every 5 seconds
         )
         

@@ -79,7 +79,7 @@ This should work with the updated workflow."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release devel"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
 
@@ -87,7 +87,7 @@ This should work with the updated workflow."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport 2.2"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
 
@@ -166,7 +166,7 @@ This should work with the updated workflow (False should be treated as false).""
         # We'll wait for the triage label to confirm the workflow ran
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
 
@@ -249,7 +249,7 @@ All these variations should be handled correctly."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release 1.0"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
 
@@ -257,7 +257,7 @@ All these variations should be handled correctly."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport 1.1"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
 
@@ -265,7 +265,7 @@ All these variations should be handled correctly."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "feature-branch"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
 

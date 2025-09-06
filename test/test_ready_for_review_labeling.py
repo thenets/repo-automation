@@ -79,7 +79,7 @@ Will be updated later to add release information."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "triage"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=10,
         )
 
@@ -111,7 +111,7 @@ Now has release information, so should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release 2.0"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=10,
         )
 
@@ -125,7 +125,7 @@ Now has release information, so should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "ready for review"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=10,
         )
 
@@ -200,7 +200,7 @@ Has release label from the start, should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release 2.0"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=10,
         )
 
@@ -211,7 +211,7 @@ Has release label from the start, should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "ready for review"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=10,
         )
 
@@ -301,7 +301,7 @@ Even though it has release info, it's a draft so should not get any labels initi
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release 1.0"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=10,
         )
 
@@ -312,7 +312,7 @@ Even though it has release info, it's a draft so should not get any labels initi
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "ready for review"
             ),
-            timeout=120,
+            timeout=60,
             poll_interval=10,
         )
 

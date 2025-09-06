@@ -98,7 +98,7 @@ The workflow should fail because 'invalid-version' is not in the accepted releas
         # Wait for triage label to be added (this should work)
         label_added = github_manager_class.poll_until_condition(
             lambda: github_manager_class.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
         assert label_added, f"Triage label should be added to PR #{pr_number}"
@@ -173,7 +173,7 @@ backports list.
         # Wait for triage label to be added (this should work)
         label_added = github_manager_class.poll_until_condition(
             lambda: github_manager_class.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
         assert label_added, f"Triage label should be added to PR #{pr_number}"
@@ -246,7 +246,7 @@ The workflow should fail because 'invalid-boolean' is not a valid boolean (true/
         # Wait for triage label to be added (this should work)
         label_added = github_manager_class.poll_until_condition(
             lambda: github_manager_class.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=120,
+            timeout=60,
             poll_interval=5,
         )
         assert label_added, f"Triage label should be added to PR #{pr_number}"
