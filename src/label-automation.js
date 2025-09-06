@@ -160,17 +160,8 @@ class LabelAutomation {
    */
   async processReleaseBackportLabeling(prData, yamlContent, features) {
     const prNumber = prData.number;
-    const headSha = prData.head.sha;
-    let checkRun = null;
 
     try {
-      // Create check run
-      checkRun = await this.client.createCheckRun(
-        'YAML Validation (Release/Backport)',
-        headSha,
-        `https://github.com/${this.config.getRepository().owner}/${this.config.getRepository().repo}/actions/runs/${this.context.runId}`
-      );
-
       const validationErrors = [];
       const labelsToAdd = [];
 
@@ -199,9 +190,9 @@ class LabelAutomation {
         }
       }
 
-      // Handle validation errors
+      // Handle validation errors by posting comments (no check runs required)
       if (validationErrors.length > 0) {
-        await this.handleValidationErrors(prNumber, checkRun.data.id, validationErrors);
+        await this.handleValidationErrors(prNumber, null, validationErrors);
         return;
       }
 
@@ -214,29 +205,13 @@ class LabelAutomation {
         this.result.labelsAdded.push(...result.added);
         this.result.actions.push(`Added release/backport labels: ${labelsToAdd.join(', ')}`);
 
-        // Update check run with success
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'success', {
-          title: 'YAML Validation Successful',
-          summary: `Successfully validated YAML and added ${labelsToAdd.length} label(s).`,
-          text: `**Labels added:**\n${labelsToAdd.map(label => `- \`${label}\``).join('\n')}\n\n**YAML validation passed** - all values are within accepted ranges.`
-        });
+        console.log(`✅ Successfully added release/backport labels: ${labelsToAdd.join(', ')}`);
       } else {
-        // Update check run - no labels to add
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'success', {
-          title: 'No YAML Validation Required',
-          summary: 'No release/backport labels to add - validation skipped.',
-          text: 'This PR does not require any release/backport labels based on the YAML configuration.'
-        });
+        console.log('ℹ️ No release/backport labels to add based on YAML configuration');
       }
 
     } catch (error) {
-      if (checkRun) {
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'failure', {
-          title: 'Label Assignment Failed',
-          summary: 'YAML validation passed but failed to add labels.',
-          text: `**Error:** ${error.message}`
-        });
-      }
+      console.error(`❌ Failed to process release/backport labeling: ${error.message}`);
       throw error;
     }
   }
@@ -352,17 +327,8 @@ class LabelAutomation {
    */
   async processFeatureBranchLabeling(prData, yamlContent) {
     const prNumber = prData.number;
-    const headSha = prData.head.sha;
-    let checkRun = null;
 
     try {
-      // Create check run
-      checkRun = await this.client.createCheckRun(
-        'YAML Validation (Feature Branch)',
-        headSha,
-        `https://github.com/${this.config.getRepository().owner}/${this.config.getRepository().repo}/actions/runs/${this.context.runId}`
-      );
-
       // Check if feature-branch label already exists
       const currentLabels = await this.client.getLabels(prNumber);
       const hasFeatureBranchLabel = currentLabels.includes('feature-branch');
@@ -370,11 +336,6 @@ class LabelAutomation {
       if (hasFeatureBranchLabel) {
         console.log('ℹ️ Feature-branch label already exists, skipping automatic assignment');
         await this.client.cleanupWorkflowComments(prNumber, '🚨 YAML Validation Error: feature branch');
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'success', {
-          title: 'Feature Branch Label Already Present',
-          summary: 'Feature-branch label already exists on this PR - skipping automatic assignment.',
-          text: 'This PR already has the feature-branch label. Automatic assignment is skipped to preserve manual labeling.'
-        });
         return;
       }
 
@@ -382,13 +343,8 @@ class LabelAutomation {
       const featureBranchValue = this.config.parseYamlValue(yamlContent, 'needs_feature_branch');
       
       if (!featureBranchValue) {
-        console.log('No needs_feature_branch field found in YAML');
+        console.log('ℹ️ No needs_feature_branch field found in YAML');
         await this.client.cleanupWorkflowComments(prNumber, '🚨 YAML Validation Error: feature branch');
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'success', {
-          title: 'No YAML Validation Required',
-          summary: 'No needs_feature_branch field found in YAML code blocks - validation skipped.',
-          text: 'This PR does not contain any needs_feature_branch field that needs validation.'
-        });
         return;
       }
 
@@ -401,38 +357,21 @@ class LabelAutomation {
         this.result.actions.push(`Added feature-branch label to PR #${prNumber}`);
 
         await this.client.cleanupWorkflowComments(prNumber, '🚨 YAML Validation Error: feature branch');
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'success', {
-          title: 'YAML Validation Successful',
-          summary: 'Successfully validated YAML and added feature-branch label.',
-          text: '**Label added:**\n- `feature-branch`\n\n**YAML validation passed** - needs_feature_branch value is valid.'
-        });
-
         console.log('✅ Successfully added feature-branch label');
 
       } else if (lowerValue === 'false' || lowerValue === '') {
         // Valid false/empty value - no action needed
         console.log('✅ No feature-branch label needed based on YAML configuration');
         await this.client.cleanupWorkflowComments(prNumber, '🚨 YAML Validation Error: feature branch');
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'success', {
-          title: 'YAML Validation Successful',
-          summary: 'Successfully validated YAML - no feature-branch label needed.',
-          text: '**YAML validation passed** - needs_feature_branch is false or empty, no label added.'
-        });
 
       } else {
-        // Invalid value
+        // Invalid value - post error comment
         const errorMsg = `❌ Invalid needs_feature_branch value: "${featureBranchValue}". Accepted values: true, false (case-insensitive, with optional quotes)`;
-        await this.handleFeatureBranchValidationError(prNumber, checkRun.data.id, errorMsg);
+        await this.handleFeatureBranchValidationError(prNumber, null, errorMsg);
       }
 
     } catch (error) {
-      if (checkRun) {
-        await this.client.updateCheckRun(checkRun.data.id, 'completed', 'failure', {
-          title: 'Workflow Execution Failed',
-          summary: 'An unexpected error occurred during workflow execution.',
-          text: `**Error:** ${error.message}\n\n**Troubleshooting:**\nCheck the workflow logs for detailed error information.`
-        });
-      }
+      console.error(`❌ Failed to process feature branch labeling: ${error.message}`);
       throw error;
     }
   }
@@ -456,19 +395,22 @@ class LabelAutomation {
       '```\n\n' +
       `_This comment was posted by the repository automation workflow._`;
 
-    await this.client.updateCheckRun(checkRunId, 'completed', 'failure', {
-      title: 'YAML Validation Failed',
-      summary: `Found ${errors.length} validation error(s) in PR description YAML block.`,
-      text: errors.map(error => `- ${error}`).join('\n') + '\n\n' +
-            '**How to fix:**\n' +
-            '1. Update your PR description YAML block with valid values\n' +
-            '2. The workflow will automatically re-run when you edit the description\n\n' +
-            '**Valid YAML format:**\n' +
-            '```yaml\n' +
-            `release: 1.5    # Valid releases: ${acceptedReleases.join(', ')}\n` +
-            `backport: 1.4   # Valid backports: ${acceptedBackports.join(', ')}\n` +
-            '```'
-    });
+    // Only update check run if checkRunId is provided (for backwards compatibility)
+    if (checkRunId) {
+      await this.client.updateCheckRun(checkRunId, 'completed', 'failure', {
+        title: 'YAML Validation Failed',
+        summary: `Found ${errors.length} validation error(s) in PR description YAML block.`,
+        text: errors.map(error => `- ${error}`).join('\n') + '\n\n' +
+              '**How to fix:**\n' +
+              '1. Update your PR description YAML block with valid values\n' +
+              '2. The workflow will automatically re-run when you edit the description\n\n' +
+              '**Valid YAML format:**\n' +
+              '```yaml\n' +
+              `release: 1.5    # Valid releases: ${acceptedReleases.join(', ')}\n` +
+              `backport: 1.4   # Valid backports: ${acceptedBackports.join(', ')}\n` +
+              '```'
+      });
+    }
 
     await this.client.createComment(prNumber, errorComment);
     console.log('💬 Posted validation error comment to PR');
@@ -490,19 +432,22 @@ class LabelAutomation {
       '```\n\n' +
       `_This comment was posted by the repository automation workflow._`;
 
-    await this.client.updateCheckRun(checkRunId, 'completed', 'failure', {
-      title: 'YAML Validation Failed',
-      summary: 'Found validation error in PR description YAML block.',
-      text: `- ${errorMsg}\n\n` +
-            '**How to fix:**\n' +
-            '1. Update your PR description YAML block with valid values\n' +
-            '2. The workflow will automatically re-run when you edit the description\n\n' +
-            '**Valid YAML format:**\n' +
-            '```yaml\n' +
-            'needs_feature_branch: true    # Valid values: true, false (case-insensitive)\n' +
-            'needs_feature_branch: false   # Quotes are optional: "true", \'false\', etc.\n' +
-            '```'
-    });
+    // Only update check run if checkRunId is provided (for backwards compatibility)
+    if (checkRunId) {
+      await this.client.updateCheckRun(checkRunId, 'completed', 'failure', {
+        title: 'YAML Validation Failed',
+        summary: 'Found validation error in PR description YAML block.',
+        text: `- ${errorMsg}\n\n` +
+              '**How to fix:**\n' +
+              '1. Update your PR description YAML block with valid values\n' +
+              '2. The workflow will automatically re-run when you edit the description\n\n' +
+              '**Valid YAML format:**\n' +
+              '```yaml\n' +
+              'needs_feature_branch: true    # Valid values: true, false (case-insensitive)\n' +
+              'needs_feature_branch: false   # Quotes are optional: "true", \'false\', etc.\n' +
+              '```'
+      });
+    }
 
     await this.client.createComment(prNumber, errorComment);
     console.log('💬 Posted validation error comment to PR');
