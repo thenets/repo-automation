@@ -190,10 +190,35 @@ flowchart TD
     W --> X[Fix Issue]
     X --> B
     
-    style A fill:#e1f5fe
-    style E fill:#fff3e0
-    style J fill:#f3e5f5
-    style Q fill:#e8f5e8
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style A1 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style A2 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style A3 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style B fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style C fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style D fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style E fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style F fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style F1 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style F2 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style G fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style H fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style I fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style J fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style K fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style L fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style M fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style N fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style O fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style P fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style Q fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style R fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style S fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style T fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style U fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style V fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style W fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style X fill:#2d3748,stroke:#4a5568,color:#e2e8f0
 ```
 
 ### Critical Testing Requirements

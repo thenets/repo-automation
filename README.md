@@ -230,6 +230,22 @@ flowchart TD
     L -->|No| M[Re-add 'triage' Label]
     L -->|Yes| N[Allow Removal]
     K -->|No| O[No Action]
+    
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style B fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style C fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style D fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style E fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style F fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style G fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style H fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style I fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style J fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style K fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style L fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style M fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style N fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style O fill:#2d3748,stroke:#4a5568,color:#e2e8f0
 ```
 
 ### 2. Keeper: stale PR detector
@@ -259,6 +275,13 @@ flowchart LR
     C -->|No| E[Skip PR]
     D --> F[✅ Complete]
     E --> F
+    
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style B fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style C fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style D fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style E fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style F fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
 ### 3. Keeper: auto-label release and backport
@@ -336,6 +359,14 @@ flowchart LR
     C -->|No| E[✅ Skip]
     D --> F[Add Labels]
     F --> G[✅ Complete]
+    
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style B fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style C fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style D fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style E fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style F fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style G fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
 ### 4. Keeper: closed PR label cleanup
@@ -360,6 +391,13 @@ flowchart LR
     C -->|No| E[Skip PR]
     D --> F[✅ Complete]
     E --> F
+    
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style B fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style C fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style D fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style E fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style F fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
 ### 5. Keeper: feature branch auto-labeling
@@ -425,6 +463,16 @@ flowchart LR
     F -->|No| H[✅ Skip]
     G --> I[✅ Complete]
     H --> I
+    
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style B fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style C fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style D fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style E fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style F fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style G fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style H fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style I fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
 ### 6. Keeper: enhanced triage label management
@@ -460,6 +508,14 @@ flowchart LR
     C -->|Yes| E[Remove triage Label]
     C -->|No| F[✅ No Action]
     E --> G[✅ Complete]
+    
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style B fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style C fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style D fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style E fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style F fill:#0f5132,stroke:#198754,color:#e2e8f0
+    style G fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
 ## Fork Compatibility
@@ -508,10 +564,19 @@ flowchart TD
     
     MA --> Z[✅ Complete]
     
-    style A fill:#e1f5fe
-    style FT fill:#fff3e0
-    style AW fill:#f3e5f5
-    style Z fill:#e8f5e8
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style FT fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style AW fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style MA fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style B fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style C fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style D fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style E fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style TG fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style M1 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style M2 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style M3 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style Z fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
 ### Fork Compatibility Status
