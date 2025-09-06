@@ -118,6 +118,9 @@ class RepositoryAutomation {
     try {
       // Only process pull_request or workflow_run events for label automation
       if (this.context.eventName === 'pull_request' || this.context.eventName === 'workflow_run') {
+        // We don't need to extract PR data here since LabelAutomation 
+        // can now handle it on its own with the updated extractPRData method
+        
         // Import label automation module when needed
         const { LabelAutomation } = require('./label-automation');
         const labelAutomation = new LabelAutomation(this.context, this.github, this.config.options);
