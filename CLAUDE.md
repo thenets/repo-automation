@@ -7,7 +7,7 @@ This repository contains GitHub Actions workflows for automating repository mana
 ## Current Features
 
 1. **Auto-Add Triage Label**: Automatically adds "triage" label to new issues and PRs
-2. **Triage Label Protection**: Prevents removal of "triage" label unless "release *" or "backport *" labels are present
+2. **Triage Label Protection**: Prevents removal of "triage" label unless "release-*" or "backport-*" labels are present
 3. **Stale PR Detection**: Automatically marks PRs as stale when inactive for more than 1 day
 
 ## Development Guidelines
@@ -53,8 +53,8 @@ make lint
    - Stale detection: `schedule` (daily cron), `workflow_dispatch` (manual trigger)
 
 3. **Pattern Matching**:
-   - Release labels: `release *` (e.g., "release 1.0", "release v2.3")
-   - Backport labels: `backport *` (e.g., "backport 1.0", "backport main")
+   - Release labels: `release-*` (e.g., "release-1.0", "release-v2.3")
+   - Backport labels: `backport-*` (e.g., "backport-1.0", "backport-main")
 
 4. **Stale Detection Logic**:
    - Runs daily at 2 AM UTC

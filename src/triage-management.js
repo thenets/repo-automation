@@ -322,14 +322,14 @@ class RepositoryAutomation {
 
       // Check label conditions
       const labelChecks = await this.client.hasLabels(prNumber, [
-        'release *',
-        'backport *', 
+        'release-*',
+        'backport-*', 
         'triage',
         'ready for review'
       ]);
 
-      const hasReleaseLabel = labelChecks['release *'];
-      const hasBackportLabel = labelChecks['backport *'];
+      const hasReleaseLabel = labelChecks['release-*'];
+      const hasBackportLabel = labelChecks['backport-*'];
       const hasTriageLabel = labelChecks['triage'];
       const hasReadyForReviewLabel = labelChecks['ready for review'];
 
@@ -406,9 +406,9 @@ class RepositoryAutomation {
     console.log(`🛡️ Triage label removed from ${eventType} #${issueNumber}, checking for protection conditions`);
 
     try {
-      const labelChecks = await this.client.hasLabels(issueNumber, ['release *', 'backport *']);
-      const hasReleaseLabel = labelChecks['release *'];
-      const hasBackportLabel = labelChecks['backport *'];
+      const labelChecks = await this.client.hasLabels(issueNumber, ['release-*', 'backport-*']);
+      const hasReleaseLabel = labelChecks['release-*'];
+      const hasBackportLabel = labelChecks['backport-*'];
 
       // If no release or backport labels, re-add triage label
       if (!hasReleaseLabel && !hasBackportLabel) {

@@ -292,3 +292,24 @@ debug-test-env: _gh_auth_check_env ## Test .env configuration and show current s
 	gh repo view "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --json name,owner,visibility,isPrivate && \
 	echo "" && \
 	echo "✅ Configuration is working correctly!"
+
+.PHONY: debug-clean-labels
+debug-clean-labels: _gh_auth_check_env ## Delete all labels from repository using .env configuration
+	@echo "⚠️  WARNING: This will delete ALL labels from the repository!"
+	@eval $$(grep -v '^#' .env | xargs) && \
+	echo "Repository: $$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" && \
+	echo "" && \
+	printf "Are you sure you want to continue? [y/N]: " && \
+	read confirm && \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		export GITHUB_TOKEN="$$GITHUB_TOKEN" && \
+		echo "Listing current labels..." && \
+		gh label list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" && \
+		echo "" && \
+		echo "Deleting all labels..." && \
+		gh label list --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" | cut -f1 | \
+		xargs -I {} gh label delete "{}" --repo "$$TEST_GITHUB_ORG/$$TEST_GITHUB_REPO" --yes && \
+		echo "✅ All labels deleted successfully!"; \
+	else \
+		echo "Operation cancelled."; \
+	fi

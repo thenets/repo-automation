@@ -36,15 +36,15 @@ class TestLabelValidation(GitHubFixtures):
         )
         # Add some valid release labels
         github_manager_class.create_label(
-            repo_path, "release 1.0", "00FF00", "Release 1.0"
+            repo_path, "release-1.0", "00FF00", "Release 1.0"
         )
         github_manager_class.create_label(
-            repo_path, "backport 1.0", "0000FF", "Backport 1.0"
+            repo_path, "backport-1.0", "0000FF", "Backport 1.0"
         )
 
         # Note: We intentionally DON'T create:
-        # - "release invalid-version"
-        # - "backport invalid-version"
+        # - "release-invalid-version"
+        # - "backport-invalid-version"
         # These will be used to test workflow failure scenarios
 
         return repo_path
@@ -108,12 +108,12 @@ The workflow should fail because 'invalid-version' is not in the accepted releas
 
         # Verify that no invalid release label was added
         labels = github_manager_class.get_pr_labels(repo_path, pr_number)
-        assert "release invalid-version" not in labels, (
+        assert "release-invalid-version" not in labels, (
             f"Invalid release label should not be added to PR #{pr_number}"
         )
 
         # The valid backport label should also not be added because the workflow failed
-        assert "backport 1.0" not in labels, (
+        assert "backport-1.0" not in labels, (
             "Backport label should not be added when workflow fails "
             "due to invalid release"
         )
@@ -183,12 +183,12 @@ backports list.
 
         # Verify that no invalid backport label was added
         labels = github_manager_class.get_pr_labels(repo_path, pr_number)
-        assert "backport invalid-backport" not in labels, (
+        assert "backport-invalid-backport" not in labels, (
             f"Invalid backport label should not be added to PR #{pr_number}"
         )
 
         # The valid release label should also not be added because the workflow failed
-        assert "release 1.0" not in labels, (
+        assert "release-1.0" not in labels, (
             "Release label should not be added when workflow fails "
             "due to invalid backport"
         )

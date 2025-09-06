@@ -33,10 +33,10 @@ class TestYAMLVariations(GitHubFixtures):
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release devel", "FF0000", "Release devel"
+            repo_path, "release-devel", "FF0000", "Release devel"
         )
         integration_manager.create_label(
-            repo_path, "backport 2.2", "00FF00", "Backport to 2.2"
+            repo_path, "backport-2.2", "00FF00", "Backport to 2.2"
         )
 
         # Create a new branch
@@ -77,7 +77,7 @@ This should work with the updated workflow."""
         # Wait for labels to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release devel"
+                repo_path, pr_number, "release-devel"
             ),
             timeout=60,
             poll_interval=5,
@@ -85,7 +85,7 @@ This should work with the updated workflow."""
 
         backport_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 2.2"
+                repo_path, pr_number, "backport-2.2"
             ),
             timeout=60,
             poll_interval=5,
@@ -96,11 +96,11 @@ This should work with the updated workflow."""
 
         # Verify the labels are indeed present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release devel" in labels, (
-            f"Expected 'release devel' label on PR #{pr_number}, but got: {labels}"
+        assert "release-devel" in labels, (
+            f"Expected 'release-devel' label on PR #{pr_number}, but got: {labels}"
         )
-        assert "backport 2.2" in labels, (
-            f"Expected 'backport 2.2' label on PR #{pr_number}, but got: {labels}"
+        assert "backport-2.2" in labels, (
+            f"Expected 'backport-2.2' label on PR #{pr_number}, but got: {labels}"
         )
 
         # Cleanup PR
@@ -199,10 +199,10 @@ This should work with the updated workflow (False should be treated as false).""
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release 1.0", "FF0000", "Release 1.0"
+            repo_path, "release-1.0", "FF0000", "Release 1.0"
         )
         integration_manager.create_label(
-            repo_path, "backport 1.1", "00FF00", "Backport to 1.1"
+            repo_path, "backport-1.1", "00FF00", "Backport to 1.1"
         )
         integration_manager.create_label(
             repo_path, "feature-branch", "FFFF00", "Feature branch required"
@@ -247,7 +247,7 @@ All these variations should be handled correctly."""
         # Wait for all labels to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.0"
+                repo_path, pr_number, "release-1.0"
             ),
             timeout=60,
             poll_interval=5,
@@ -255,7 +255,7 @@ All these variations should be handled correctly."""
 
         backport_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 1.1"
+                repo_path, pr_number, "backport-1.1"
             ),
             timeout=60,
             poll_interval=5,
@@ -275,7 +275,7 @@ All these variations should be handled correctly."""
 
         # Verify all labels are indeed present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        expected_labels = ["release 1.0", "backport 1.1", "feature-branch"]
+        expected_labels = ["release-1.0", "backport-1.1", "feature-branch"]
         
         for expected_label in expected_labels:
             assert expected_label in labels, (

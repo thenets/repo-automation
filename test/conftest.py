@@ -1508,11 +1508,11 @@ class GitHubFixtures:
 
             # Create release and backport labels for testing
             github_manager_class.create_label(
-                repo_path, "release 1.0", "00FF00", "Release 1.0"
+                repo_path, "release-1.0", "00FF00", "Release 1.0"
             )
 
             github_manager_class.create_label(
-                repo_path, "backport main", "0000FF", "Backport to main"
+                repo_path, "backport-main", "0000FF", "Backport to main"
             )
 
             yield repo_path

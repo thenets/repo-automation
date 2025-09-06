@@ -65,7 +65,7 @@ class GitHubClient {
     
     labelNames.forEach(labelName => {
       if (labelName.endsWith('*')) {
-        // Wildcard matching (e.g., "release *")
+        // Wildcard matching (e.g., "release-*")
         const prefix = labelName.slice(0, -1);
         result[labelName] = currentLabels.some(label => label.startsWith(prefix));
       } else {

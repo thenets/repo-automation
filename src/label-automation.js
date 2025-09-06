@@ -137,8 +137,8 @@ class LabelAutomation {
 
       // Check existing labels to avoid overwriting manual labels
       const currentLabels = await this.client.getLabels(prNumber);
-      const hasExistingReleaseLabel = currentLabels.some(label => label.startsWith('release '));
-      const hasExistingBackportLabel = currentLabels.some(label => label.startsWith('backport '));
+      const hasExistingReleaseLabel = currentLabels.some(label => label.startsWith('release-'));
+      const hasExistingBackportLabel = currentLabels.some(label => label.startsWith('backport-'));
 
       // Process release labeling
       if (features.releaseLabeling) {
@@ -213,13 +213,13 @@ class LabelAutomation {
     }
 
     if (hasExistingLabel) {
-      console.log(`Release label already exists, skipping automatic assignment of "release ${releaseValue}"`);
+      console.log(`Release label already exists, skipping automatic assignment of "release-${releaseValue}"`);
       return { label: null, error: null };
     }
 
     if (this.config.validateReleaseValue(releaseValue)) {
       console.log(`Found valid release: ${releaseValue}`);
-      return { label: `release ${releaseValue}`, error: null };
+      return { label: `release-${releaseValue}`, error: null };
     } else {
       const acceptedReleases = this.config.getAcceptedReleases();
       return { 
@@ -240,13 +240,13 @@ class LabelAutomation {
     }
 
     if (hasExistingLabel) {
-      console.log(`Backport label already exists, skipping automatic assignment of "backport ${backportValue}"`);
+      console.log(`Backport label already exists, skipping automatic assignment of "backport-${backportValue}"`);
       return { label: null, error: null };
     }
 
     if (this.config.validateBackportValue(backportValue)) {
       console.log(`Found valid backport: ${backportValue}`);
-      return { label: `backport ${backportValue}`, error: null };
+      return { label: `backport-${backportValue}`, error: null };
     } else {
       const acceptedBackports = this.config.getAcceptedBackports();
       return { 

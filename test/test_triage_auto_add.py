@@ -287,7 +287,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         assert label_added, f"Triage label was not added to PR #{pr_number}"
 
         # Add release label
-        integration_manager.add_labels_to_pr(repo_path, pr_number, ["release 1.0"])
+        integration_manager.add_labels_to_pr(repo_path, pr_number, ["release-1.0"])
 
         # Wait a moment for the addition to process
         time.sleep(2)
@@ -361,7 +361,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         assert label_added, f"Triage label was not added to PR #{pr_number}"
 
         # Add backport label
-        integration_manager.add_labels_to_pr(repo_path, pr_number, ["backport main"])
+        integration_manager.add_labels_to_pr(repo_path, pr_number, ["backport-main"])
 
         # Wait a moment for the addition to process
         time.sleep(2)

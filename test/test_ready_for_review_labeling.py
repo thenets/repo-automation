@@ -103,13 +103,13 @@ Now has release information, so should get ready for review label."""
 
         # Ensure required release label exists
         integration_manager.create_label(
-            repo_path, "release 2.0", "00FF00", "Release 2.0"
+            repo_path, "release-2.0", "00FF00", "Release 2.0"
         )
 
         # Wait for release label to be added after PR description update
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 2.0"
+                repo_path, pr_number, "release-2.0"
             ),
             timeout=60,
             poll_interval=10,
@@ -133,7 +133,7 @@ Now has release information, so should get ready for review label."""
 
         # Verify final state: should have release label and ready for review label
         final_labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 2.0" in final_labels, f"Release label should be present: {final_labels}"
+        assert "release-2.0" in final_labels, f"Release label should be present: {final_labels}"
         assert "ready for review" in final_labels, f"Ready for review label should be present: {final_labels}"
         assert "triage" not in final_labels, f"Triage label should not be present: {final_labels}"
 
@@ -155,7 +155,7 @@ Now has release information, so should get ready for review label."""
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release 2.0", "00FF00", "Release 2.0"
+            repo_path, "release-2.0", "00FF00", "Release 2.0"
         )
         integration_manager.create_label(
             repo_path, "ready for review", "0E8A16", "PR is ready for team review"
@@ -198,7 +198,7 @@ Has release label from the start, should get ready for review label."""
         # Wait for release label to be added first
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 2.0"
+                repo_path, pr_number, "release-2.0"
             ),
             timeout=60,
             poll_interval=10,
@@ -219,7 +219,7 @@ Has release label from the start, should get ready for review label."""
 
         # Verify final state: should have both release and ready for review labels
         final_labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 2.0" in final_labels, f"Release label should be present: {final_labels}"
+        assert "release-2.0" in final_labels, f"Release label should be present: {final_labels}"
         assert "ready for review" in final_labels, f"Ready for review label should be present: {final_labels}"
 
         # Cleanup PR
@@ -265,7 +265,7 @@ This file contains a simple change for testing draft PR behavior.
 
         # Ensure required release label exists
         integration_manager.create_label(
-            repo_path, "release 1.0", "00FF00", "Release 1.0"
+            repo_path, "release-1.0", "00FF00", "Release 1.0"
         )
 
         # Create DRAFT PR with YAML code block (has release label)
@@ -290,7 +290,7 @@ Even though it has release info, it's a draft so should not get any labels initi
         draft_labels = integration_manager.get_pr_labels(repo_path, pr_number)
         assert "triage" not in draft_labels, f"Draft PR should not have triage label: {draft_labels}"
         assert "ready for review" not in draft_labels, f"Draft PR should not have ready for review label: {draft_labels}"
-        assert "release 1.0" not in draft_labels, f"Draft PR should not have release label: {draft_labels}"
+        assert "release-1.0" not in draft_labels, f"Draft PR should not have release label: {draft_labels}"
 
         # Mark PR as ready for review
         ready_success = integration_manager.mark_pr_ready_for_review(repo_path, pr_number)
@@ -299,7 +299,7 @@ Even though it has release info, it's a draft so should not get any labels initi
         # Wait for release label to be added first (now that it's not draft)
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.0"
+                repo_path, pr_number, "release-1.0"
             ),
             timeout=60,
             poll_interval=10,
@@ -320,7 +320,7 @@ Even though it has release info, it's a draft so should not get any labels initi
 
         # Verify final state: should have both release and ready for review labels
         final_labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 1.0" in final_labels, f"Release label should be present: {final_labels}"
+        assert "release-1.0" in final_labels, f"Release label should be present: {final_labels}"
         assert "ready for review" in final_labels, f"Ready for review label should be present: {final_labels}"
 
         # Cleanup PR

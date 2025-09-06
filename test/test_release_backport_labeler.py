@@ -37,10 +37,10 @@ class TestReleaseBackportLabeler(GitHubFixtures):
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release 2.0", "00FF00", "Release 2.0"
+            repo_path, "release-2.0", "00FF00", "Release 2.0"
         )
         integration_manager.create_label(
-            repo_path, "backport 1.2", "0000FF", "Backport to 1.2"
+            repo_path, "backport-1.2", "0000FF", "Backport to 1.2"
         )
 
         # Create a new branch
@@ -81,7 +81,7 @@ The changes are backward compatible."""
         # Wait for labels to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 2.0"
+                repo_path, pr_number, "release-2.0"
             ),
             timeout=60,
             poll_interval=5,
@@ -89,7 +89,7 @@ The changes are backward compatible."""
 
         backport_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 1.2"
+                repo_path, pr_number, "backport-1.2"
             ),
             timeout=60,
             poll_interval=5,
@@ -100,11 +100,11 @@ The changes are backward compatible."""
 
         # Verify the labels are indeed present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 2.0" in labels, (
-            f"Expected 'release 2.0' label on PR #{pr_number}, but got: {labels}"
+        assert "release-2.0" in labels, (
+            f"Expected 'release-2.0' label on PR #{pr_number}, but got: {labels}"
         )
-        assert "backport 1.2" in labels, (
-            f"Expected 'backport 1.2' label on PR #{pr_number}, but got: {labels}"
+        assert "backport-1.2" in labels, (
+            f"Expected 'backport-1.2' label on PR #{pr_number}, but got: {labels}"
         )
 
         # Cleanup PR
@@ -126,10 +126,10 @@ The changes are backward compatible."""
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release devel", "FF0000", "Release devel"
+            repo_path, "release-devel", "FF0000", "Release devel"
         )
         integration_manager.create_label(
-            repo_path, "backport 2.1", "00FFFF", "Backport to 2.1"
+            repo_path, "backport-2.1", "00FFFF", "Backport to 2.1"
         )
 
         # Create a new branch
@@ -170,7 +170,7 @@ These changes are for the development branch."""
         # Wait for labels to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release devel"
+                repo_path, pr_number, "release-devel"
             ),
             timeout=60,
             poll_interval=5,
@@ -178,7 +178,7 @@ These changes are for the development branch."""
 
         backport_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 2.1"
+                repo_path, pr_number, "backport-2.1"
             ),
             timeout=60,
             poll_interval=5,
@@ -189,11 +189,11 @@ These changes are for the development branch."""
 
         # Verify the labels are indeed present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release devel" in labels, (
-            f"Expected 'release devel' label on PR #{pr_number}, but got: {labels}"
+        assert "release-devel" in labels, (
+            f"Expected 'release-devel' label on PR #{pr_number}, but got: {labels}"
         )
-        assert "backport 2.1" in labels, (
-            f"Expected 'backport 2.1' label on PR #{pr_number}, but got: {labels}"
+        assert "backport-2.1" in labels, (
+            f"Expected 'backport-2.1' label on PR #{pr_number}, but got: {labels}"
         )
 
         # Cleanup PR
@@ -227,10 +227,10 @@ These changes are for the development branch."""
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release 1.0", "00FF00", "Release 1.0"
+            repo_path, "release-1.0", "00FF00", "Release 1.0"
         )
         integration_manager.create_label(
-            repo_path, "backport 1.1", "0000FF", "Backport to 1.1"
+            repo_path, "backport-1.1", "0000FF", "Backport to 1.1"
         )
 
         # Create a new branch
@@ -321,7 +321,7 @@ backport: 1.1#another comment
         # Wait for labels to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.0"
+                repo_path, pr_number, "release-1.0"
             ),
             timeout=60,
             poll_interval=5,
@@ -329,7 +329,7 @@ backport: 1.1#another comment
 
         backport_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 1.1"
+                repo_path, pr_number, "backport-1.1"
             ),
             timeout=60,
             poll_interval=5,
@@ -344,11 +344,11 @@ backport: 1.1#another comment
 
         # Verify the labels are present
         updated_labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 1.0" in updated_labels, (
-            f"Expected 'release 1.0' label after update ({test_description}), got: {updated_labels}"
+        assert "release-1.0" in updated_labels, (
+            f"Expected 'release-1.0' label after update ({test_description}), got: {updated_labels}"
         )
-        assert "backport 1.1" in updated_labels, (
-            f"Expected 'backport 1.1' label after update ({test_description}), got: {updated_labels}"
+        assert "backport-1.1" in updated_labels, (
+            f"Expected 'backport-1.1' label after update ({test_description}), got: {updated_labels}"
         )
 
         # Cleanup PR
@@ -370,7 +370,7 @@ backport: 1.1#another comment
 
         # Ensure required label exists
         integration_manager.create_label(
-            repo_path, "release 1.2", "FFFF00", "Release 1.2"
+            repo_path, "release-1.2", "FFFF00", "Release 1.2"
         )
 
         # Create a new branch
@@ -410,7 +410,7 @@ No backport is needed for this change."""
         # Wait for release label to be added
         release_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.2"
+                repo_path, pr_number, "release-1.2"
             ),
             timeout=60,
             poll_interval=5,
@@ -420,8 +420,8 @@ No backport is needed for this change."""
 
         # Verify the labels
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
-        assert "release 1.2" in labels, (
-            f"Expected 'release 1.2' label on PR #{pr_number}, but got: {labels}"
+        assert "release-1.2" in labels, (
+            f"Expected 'release-1.2' label on PR #{pr_number}, but got: {labels}"
         )
 
         # Verify no backport labels are present
@@ -714,8 +714,8 @@ The tags above are now valid and should cause the error comment to be automatica
         final_release_labels = [label for label in final_labels if label.startswith("release")]
         final_backport_labels = [label for label in final_labels if label.startswith("backport")]
 
-        assert "release 1.0" in final_labels, f"Expected 'release 1.0' label to be added, but found: {final_labels}"
-        assert "backport 1.1" in final_labels, f"Expected 'backport 1.1' label to be added, but found: {final_labels}"
+        assert "release-1.0" in final_labels, f"Expected 'release-1.0' label to be added, but found: {final_labels}"
+        assert "backport-1.1" in final_labels, f"Expected 'backport-1.1' label to be added, but found: {final_labels}"
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
@@ -815,10 +815,10 @@ The empty values above should be handled gracefully without workflow failure."""
 
         # Ensure required labels exist
         integration_manager.create_label(
-            repo_path, "release 1.2", "00FF00", "Release 1.2"
+            repo_path, "release-1.2", "00FF00", "Release 1.2"
         )
         integration_manager.create_label(
-            repo_path, "backport 1.1", "0000FF", "Backport to 1.1"
+            repo_path, "backport-1.1", "0000FF", "Backport to 1.1"
         )
 
         # Create a new branch
@@ -861,7 +861,7 @@ Initial release and backport configuration."""
         # Wait for initial labels to be added
         initial_release_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "release 1.2"
+                repo_path, pr_number, "release-1.2"
             ),
             timeout=60,
             poll_interval=5,
@@ -869,7 +869,7 @@ Initial release and backport configuration."""
 
         initial_backport_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(
-                repo_path, pr_number, "backport 1.1"
+                repo_path, pr_number, "backport-1.1"
             ),
             timeout=60,
             poll_interval=5,
@@ -906,18 +906,18 @@ Updated release and backport configuration (should be ignored)."""
         final_labels = integration_manager.get_pr_labels(repo_path, pr_number)
 
         # Original labels should still be present
-        assert "release 1.2" in final_labels, (
+        assert "release-1.2" in final_labels, (
             f"Original release label should be preserved, but got: {final_labels}"
         )
-        assert "backport 1.1" in final_labels, (
+        assert "backport-1.1" in final_labels, (
             f"Original backport label should be preserved, but got: {final_labels}"
         )
 
         # New labels from updated description should NOT be added
-        assert "release 1.5" not in final_labels, (
+        assert "release-1.5" not in final_labels, (
             f"New release label should not be added when existing label present"
         )
-        assert "backport 1.4" not in final_labels, (
+        assert "backport-1.4" not in final_labels, (
             f"New backport label should not be added when existing label present"
         )
 

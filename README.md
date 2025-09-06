@@ -203,7 +203,7 @@ Unified workflow that handles triage labeling, label protection, and ready-for-r
 **For Pull Requests:**
 1. **Waits 10 seconds** for other workflows to complete
 2. **Smart Conditional Labeling**:
-   - If PR has "release *" label AND is not in draft mode → Adds "ready for review" label
+   - If PR has "release-*" label AND is not in draft mode → Adds "ready for review" label
    - Otherwise → Adds "triage" label
 3. **Label Protection**: Prevents "triage" label removal unless release/backport labels are present
 4. **Draft Handling**: Skips labeling for draft PRs entirely
@@ -220,7 +220,7 @@ flowchart TD
     C[New PR] --> D{Is Draft?}
     D -->|Yes| E[Skip Labeling]
     D -->|No| F[Wait 10 seconds]
-    F --> G{Has 'release *' Label?}
+    F --> G{Has 'release-*' Label?}
     G -->|Yes| H[Add 'ready for review' Label]
     G -->|No| I[Add 'triage' Label]
     J[Label Removed] --> K{Is 'triage' Label?}
@@ -270,7 +270,7 @@ Automatically adds release and backport labels to pull requests based on YAML co
 - Scans the PR description for YAML code blocks
 - Parses `release` and `backport` values from YAML
 - Validates values against accepted lists (see below)
-- Adds corresponding labels (e.g., `release 1.5`, `backport 1.4`)
+- Adds corresponding labels (e.g., `release-1.5`, `backport-1.4`)
 - Ignores comments after `#` in YAML values
 - Only processes the first YAML block found
 
@@ -292,8 +292,8 @@ Automatically adds release and backport labels to pull requests based on YAML co
 
 Include a YAML code block in your PR description:
 ```yaml
-release: 1.5        # Creates "release 1.5" label
-backport: 1.4       # Creates "backport 1.4" label
+release: 1.5        # Creates "release-1.5" label
+backport: 1.4       # Creates "backport-1.4" label
 release: "devel"    # Quotes are supported (single or double)
 backport: 'main'    # Both single and double quotes work
 ```
@@ -373,8 +373,8 @@ Include a YAML code block in your PR description:
 needs_feature_branch: true    # Creates "feature-branch" label
 needs_feature_branch: True    # Case-insensitive: True, FALSE, etc.
 needs_feature_branch: "false" # Quotes are supported (single or double)
-release: 1.5                  # Creates "release 1.5" label (existing feature)
-backport: 1.4                 # Creates "backport 1.4" label (existing feature)
+release: 1.5                  # Creates "release-1.5" label (existing feature)
+backport: 1.4                 # Creates "backport-1.4" label (existing feature)
 ```
 
 **Example PR description**:
@@ -412,13 +412,13 @@ Enhances the existing triage label protection by automatically removing the "tri
 **Behavior**:
 - Monitors when labels are added or removed from PRs
 - Automatically removes "triage" label when ALL conditions are met:
-  - PR has any label starting with "release " (e.g., "release 1.5", "release main")
+  - PR has any label starting with "release-" (e.g., "release-1.5", "release-main")
   - PR has "ready for review" label
 - This indicates the PR is properly categorized and ready for review, so triage is no longer needed
 - Works in conjunction with existing triage protection workflow
 
 **Logic Flow**:
-1. **Label Change Detected** → Check if PR has both "release *" and "ready for review" labels
+1. **Label Change Detected** → Check if PR has both "release-*" and "ready for review" labels
 2. **Conditions Met** → Remove "triage" label (if present)
 3. **Conditions Not Met** → No action taken (existing protection workflow handles re-adding if needed)
 
