@@ -30,19 +30,46 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-**Complete Automation (All Features):**
+**Complete Automation (Fork-Compatible Two-Workflow Pattern):**
+
+Create two workflows for fork compatibility:
+
+*1. Trigger Workflow (`repository-automation-trigger.yml`):*
 ```yaml
-name: Complete Repository Automation
+name: "Repository Automation: Trigger"
 on:
   issues:
     types: [opened, labeled, unlabeled]
   pull_request:
     types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  collect-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect PR/Issue Metadata
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Collects metadata and stores as artifact
+            // See test/templates/repository-automation-trigger.yml for full implementation
+```
+
+*2. Main Automation Workflow (`repository-automation.yml`):*
+```yaml
+name: Complete Repository Automation
+on:
   workflow_run:
-    workflows: ["Keeper: trigger"]
+    workflows: ["Repository Automation: Trigger"]
     types: [completed]
   schedule:
     - cron: '0 2 * * *'
+  workflow_dispatch:
 
 permissions:
   issues: write
@@ -82,19 +109,6 @@ jobs:
 
 📚 **See [examples/comprehensive-usage.yml](examples/comprehensive-usage.yml) for comprehensive configuration examples and migration guides.**
 
-### Migration Status
-
-| Feature | Original Workflow | GitHub Action | Repository Status |
-|---------|------------------|---------------|--------------------|
-| **Triage Management** | `keeper-triage.yml` (339 lines) | ✅ Integrated | **🗑️ REMOVED** |
-| **Stale Detection** | `keeper-stale-pr-detector.yml` (235 lines) | ✅ Integrated | **🗑️ REMOVED** |
-| **Release/Backport Labeling** | `keeper-auto-label-release-backport.yml` (442 lines) | ✅ Integrated | **🗑️ REMOVED** |
-| **Feature Branch Labeling** | `keeper-feature-branch-auto-labeling.yml` (456 lines) | ✅ Integrated | **🗑️ REMOVED** |
-| **Fork Compatibility** | `keeper-trigger.yml` (163 lines) | ✅ Preserved | **✅ ACTIVE** |
-| **Unified Automation** | **NEW**: `repository-automation.yml` (79 lines) | ✅ Active | **✅ DEPLOYED** |
-
-**Migration Result**: ✅ **COMPLETE** - All legacy workflows removed and replaced with unified GitHub Action!  
-**Code Reduction**: 1,635 lines → 79 lines (**95% reduction**) + reusable action benefits
 
 ---
 
@@ -110,20 +124,26 @@ jobs:
 - [⚙️ Development](#development)
 - [📄 License](#license)
 
-## 🎉 Current Workflow Structure (Post-Migration)
+## 🎉 Current Implementation Structure
 
+**Workflow Templates** (for deployment to target repositories):
+```
+test/templates/
+├── repository-automation-trigger.yml   # 🔄 Fork-compatible metadata collection
+└── repository-automation.yml          # 🚀 Main automation using GitHub Action
+```
+
+**This Repository's Workflows**:
 ```
 .github/workflows/
-├── repository-automation.yml           # 🆕 Unified automation using the GitHub Action (79 lines)
-├── keeper-trigger.yml                  # Fork compatibility (preserved)
-└── test-triage-action.yml             # Enhanced testing workflow
+├── dependabot-auto-merge.yml           # 🤖 Dependabot automation
+└── [minimal workflows for this repo]
 ```
 
-**Previously (REMOVED):**
-- ~~`keeper-triage.yml`~~ (339 lines) → Integrated into action
-- ~~`keeper-stale-pr-detector.yml`~~ (235 lines) → Integrated into action  
-- ~~`keeper-auto-label-release-backport.yml`~~ (442 lines) → Integrated into action
-- ~~`keeper-feature-branch-auto-labeling.yml`~~ (456 lines) → Integrated into action
+**Two-Workflow Pattern Benefits:**
+- ✅ **Fork Compatible**: External contributors can trigger automation
+- ✅ **Secure**: Secrets only accessed in main repository workflow
+- ✅ **Reliable**: Metadata collection works without elevated permissions
 
 ## 🎉 Migration Complete - This Repository as Reference
 
@@ -137,25 +157,33 @@ This repository serves as a **real-world migration example**:
 - **After**: 1 unified workflow using the action (79 lines)  
 - **Result**: 95% code reduction + simplified maintenance
 
-**Active Workflows in This Repository:**
-- `repository-automation.yml` - Complete automation using the action
-- `keeper-trigger.yml` - Fork compatibility (preserved)  
-- `test-triage-action.yml` - Testing workflow (enhanced)
+**Template Files Available:**
+- `test/templates/repository-automation-trigger.yml` - Fork-compatible metadata collection
+- `test/templates/repository-automation.yml` - Main automation workflow using the action
+- `examples/comprehensive-usage.yml` - Complete configuration examples
 
 ### Migration Guide for Your Repository
 
-To migrate your repository from individual workflows:
+To set up repository automation using the two-workflow pattern:
 
-1. **Replace** all `keeper-*.yml` files with a single `repository-automation.yml` using the action
-2. **Keep** `keeper-trigger.yml` for fork compatibility (if needed)
-3. **Configure** features using action inputs instead of separate files
-4. **Test** using dry-run mode first
+1. **Copy** `test/templates/repository-automation-trigger.yml` to your `.github/workflows/` directory
+2. **Copy** `test/templates/repository-automation.yml` to your `.github/workflows/` directory
+3. **Update** the repository reference in the main workflow: `if: github.repository == 'your-org/your-repo'`
+4. **Configure** features using action inputs in the main workflow
+5. **Test** using dry-run mode first
 
 ### Legacy Documentation (Historical Reference)
 
-> ⚠️ **Note**: The sections below document the original individual workflows for historical reference only. **These workflows have been removed from this repository** and replaced with the unified GitHub Action. 
+> ⚠️ **IMPORTANT**: The sections below are **HISTORICAL DOCUMENTATION ONLY**. These individual workflows have been:
+> - **🗑️ REMOVED** from this repository
+> - **✅ REPLACED** with the unified GitHub Action using the two-workflow pattern
 > 
-> For current usage, see the [GitHub Action examples](#-github-action-action-mode-only) and [comprehensive configuration guide](examples/comprehensive-usage.yml).
+> **For current implementation:**
+> - Use `test/templates/repository-automation-trigger.yml` + `test/templates/repository-automation.yml`
+> - See [Quick Start examples](#quick-start) above
+> - Read [comprehensive configuration guide](examples/comprehensive-usage.yml)
+>
+> **This legacy documentation is kept only for reference and migration purposes.**
 
 ## Features
 
@@ -164,7 +192,7 @@ Unified workflow that handles triage labeling, label protection, and ready-for-r
 
 **File**: `.github/workflows/keeper-triage.yml`
 
-**Trigger**: `issues.opened`, `workflow_run` (from `keeper-trigger.yml`)
+**Trigger**: `issues.opened`, `workflow_run` (from `repository-automation-trigger.yml`)
 
 **Behavior**:
 
@@ -424,8 +452,8 @@ Traditional GitHub Actions workflows fail when triggered by pull requests from f
 
 We implement a **two-workflow pattern** that separates data collection from privileged operations:
 
-1. **Data Collection Workflow** (`keeper-trigger`): Runs on any repository (including forks), collects ALL PR metadata as-is
-2. **Action Workflows** (`keeper-*`): Triggered by data collection completion, run only on target repository with full permissions
+1. **Trigger Workflow** (`repository-automation-trigger`): Runs on any repository (including forks), collects ALL PR metadata as-is
+2. **Main Automation Workflow** (`repository-automation`): Triggered by data collection completion, run only on target repository with full permissions
 
 ### Workflow Communication Pattern
 
@@ -433,7 +461,7 @@ We implement a **two-workflow pattern** that separates data collection from priv
 flowchart TD
     A[PR Created/Updated on Fork] --> FT
     
-    subgraph FT ["🔄 keeper-trigger.yml (Runs on Fork)"]
+    subgraph FT ["🔄 repository-automation-trigger.yml (Runs on Fork)"]
         direction TB
         B[Collect PR Metadata]
         C[Extract: title, body, draft, etc.]
@@ -446,26 +474,14 @@ flowchart TD
     
     subgraph AW ["🎯 Action Workflows (Run on Target Repo)"]
         direction TB
-        subgraph FB ["keeper-feature-branch-auto-labeling.yml"]
-            F1[Download Artifact] --> F2[Parse YAML from prData.body] --> F3[Apply feature-branch Label]
-        end
-        
-        subgraph RB ["keeper-auto-label-release-backport.yml"]
-            R1[Download Artifact] --> R2[Parse YAML from prData.body] --> R3[Apply release/backport Labels]
-        end
-        
-        subgraph UT ["keeper-triage.yml"]
-            U1[Download Artifact] --> U2[Check draft & labels] --> U3[Apply triage OR ready-for-review Label]
+        subgraph MA ["repository-automation.yml (Main Automation)"]
+            M1[Download Artifact] --> M2[Execute Complete Repository Automation] --> M3[Apply All Labels & Features]
         end
     end
     
-    TG --> FB
-    TG --> RB  
-    TG --> UT
+    TG --> MA
     
-    FB --> Z[✅ Complete]
-    RB --> Z
-    UT --> Z
+    MA --> Z[✅ Complete]
     
     style A fill:#e1f5fe
     style FT fill:#fff3e0
@@ -477,11 +493,8 @@ flowchart TD
 
 | Workflow | Fork Compatible | Status | Notes |
 |----------|-----------------|--------|--------|
-| **keeper-trigger.yml** | ✅ N/A | ✅ Working | Central data collection workflow |
-| **keeper-triage.yml** | ✅ Yes | ✅ Complete | Unified triage management with full artifact consumption |
-| **keeper-auto-label-release-backport.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
-| **keeper-feature-branch-auto-labeling.yml** | ✅ Yes | ✅ Complete | Full artifact consumption |
-| **keeper-stale-pr-detector.yml** | ✅ N/A | ✅ No changes needed | Uses schedule/dispatch |
+| **repository-automation-trigger.yml** | ✅ N/A | ✅ Working | Metadata collection workflow (runs on forks) |
+| **repository-automation.yml** | ✅ Yes | ✅ Complete | Main automation with full GitHub Action features |
 
 ### Benefits
 
@@ -552,6 +565,22 @@ When external contributors (non-collaborators) create pull requests or issues, t
    - Change `if: github.repository == 'thenets/repo-automations'` to `if: github.repository == 'your-username/repo-automations'`
    - This line appears in all `keeper-*.yml` workflow files under `.github/workflows/`
 
+### Workflow Templates
+
+Workflow templates are stored in `test/templates/` for deployment to target repositories:
+
+```
+test/templates/
+├── repository-automation-trigger.yml   # Fork-compatible metadata collection
+└── repository-automation.yml          # Main automation using GitHub Action
+```
+
+**Template Usage:**
+1. Copy both templates to your repository's `.github/workflows/` directory  
+2. Update the repository reference in `repository-automation.yml`
+3. Configure action inputs as needed
+4. Test with dry-run mode first
+
 ### Test File Structure
 
 The test suite is organized with shared fixtures and utilities in a centralized structure:
@@ -601,11 +630,11 @@ When adding a new automation workflow, follow these guidelines:
 #### 1. **Workflow Architecture**
 All new workflows should follow the **fork-compatible two-workflow pattern**:
 
-- **Data Collection**: Use `keeper-trigger.yml` to collect PR/issue metadata
-- **Action Workflow**: Create your new workflow triggered by `workflow_run` from `keeper-trigger`
+- **Data Collection**: Use `repository-automation-trigger.yml` template to collect PR/issue metadata
+- **Action Workflow**: Use `repository-automation.yml` template with the GitHub Action
 
 #### 2. **Design Pattern**
-Use `keeper-auto-label-release-backport.yml` as your reference template:
+Use the template files for your setup:
 
 ```yaml
 name: "Your New Workflow"
@@ -636,13 +665,13 @@ jobs:
 ```
 
 #### 3. **Implementation Checklist**
-- [ ] **Trigger**: Use `workflow_run` from `keeper-trigger.yml`
-- [ ] **Repository Check**: Include `if: github.repository == 'your-org/your-repo'` condition
-- [ ] **Permissions**: Add required `issues: write` and `pull-requests: write` permissions
-- [ ] **Artifact Download**: Download `pr-metadata` artifact for PR/issue data
-- [ ] **Error Handling**: Implement error reporting with comments and check runs (see release/backport workflow)
+- [ ] **Copy Templates**: Use `test/templates/repository-automation-trigger.yml` and `test/templates/repository-automation.yml`
+- [ ] **Repository Check**: Update `if: github.repository == 'your-org/your-repo'` condition in main workflow
+- [ ] **Permissions**: Ensure workflows have required permissions (trigger: read-only, main: write)
+- [ ] **Action Configuration**: Configure the GitHub Action inputs in the main workflow
+- [ ] **Secrets**: Set up `CUSTOM_GITHUB_TOKEN` secret for external contributor support
 - [ ] **Fork Compatibility**: Test with external contributor PRs
-- [ ] **File Naming**: Use `keeper-{feature-name}.yml` convention
+- [ ] **File Naming**: Use `repository-automation-trigger.yml` and `repository-automation.yml`
 
 #### 4. **Error Reporting Pattern**
 For workflows that validate YAML or user input, implement error reporting:
