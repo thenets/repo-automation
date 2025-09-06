@@ -94,7 +94,7 @@ jobs:
 ### Features Auto-Enabled by Inputs
 
 - **Core Triage**: Always enabled (adds triage labels, smart labeling, label protection)
-- **Release/Backport Labeling**: Enabled when `accepted-releases` or `accepted-backports` provided
+- **Release/Backport Labeling**: Enabled when `accepted-releases` or `accepted-backports` provided (supports multiple versions with array syntax)
 - **Feature Branch Automation**: Enabled when `enable-feature-branch: true`
 - **Stale Detection**: Enabled when `stale-days` provided or `schedule` event
 
@@ -292,10 +292,16 @@ Automatically adds release and backport labels to pull requests based on YAML co
 
 Include a YAML code block in your PR description:
 ```yaml
+# Single version (existing syntax)
 release: 1.5        # Creates "release-1.5" label
 backport: 1.4       # Creates "backport-1.4" label
 release: "devel"    # Quotes are supported (single or double)
 backport: 'main'    # Both single and double quotes work
+
+# Multiple versions (new array syntax)
+release: ["1.5", "2.0"]     # Creates "release-1.5" and "release-2.0" labels
+backport: ["1.4", "1.5"]    # Creates "backport-1.4" and "backport-1.5" labels
+backport: ['1.6']           # Single-element array (creates "backport-1.6" label)
 ```
 
 **Example PR description**:
@@ -308,6 +314,17 @@ backport: 'main'    # Both single and double quotes work
 > ```
 > 
 > The changes are backward compatible.
+
+**Example with multiple versions (array syntax)**:
+
+> This PR adds new feature Y that requires multiple releases.
+> 
+> ```yaml
+> release: ["2.0", "2.1"]     # Creates both release-2.0 and release-2.1 labels
+> backport: ["1.4", "1.5"]    # Creates both backport-1.4 and backport-1.5 labels
+> ```
+> 
+> These changes need to be available in multiple versions.
 
 ```mermaid
 flowchart LR
@@ -373,8 +390,14 @@ Include a YAML code block in your PR description:
 needs_feature_branch: true    # Creates "feature-branch" label
 needs_feature_branch: True    # Case-insensitive: True, FALSE, etc.
 needs_feature_branch: "false" # Quotes are supported (single or double)
-release: 1.5                  # Creates "release-1.5" label (existing feature)
-backport: 1.4                 # Creates "backport-1.4" label (existing feature)
+
+# Single version release/backport (existing syntax)
+release: 1.5                  # Creates "release-1.5" label
+backport: 1.4                 # Creates "backport-1.4" label
+
+# Multiple versions release/backport (new array syntax)
+release: ["1.5", "2.0"]       # Creates "release-1.5" and "release-2.0" labels
+backport: ["1.4", "1.5"]      # Creates "backport-1.4" and "backport-1.5" labels
 ```
 
 **Example PR description**:

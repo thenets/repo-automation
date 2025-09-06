@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(*pytest*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/luiz/projects/thenets/repo-automation/.claude/pytest-pre-runner.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

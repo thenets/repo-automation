@@ -923,3 +923,174 @@ Updated release and backport configuration (should be ignored)."""
 
         # Cleanup PR
         integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_multiple_versions_array_syntax(self, test_repo, integration_manager):
+        """Test that PR with array syntax for multiple versions works correctly.
+
+        This test validates the implementation of issue #358 - support for multiple versions.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with array YAML values in description
+        5. Wait for multiple labels to be added
+        6. Verify all expected labels are present
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+
+        # Ensure required labels exist
+        integration_manager.create_label(
+            repo_path, "release-2.0", "FF0000", "Release 2.0"
+        )
+        integration_manager.create_label(
+            repo_path, "release-2.1", "FF0000", "Release 2.1"
+        )
+        integration_manager.create_label(
+            repo_path, "backport-1.4", "00FF00", "Backport to 1.4"
+        )
+        integration_manager.create_label(
+            repo_path, "backport-1.5", "00FF00", "Backport to 1.5"
+        )
+
+        # Create a new branch
+        branch_name = f"test-array-syntax-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+
+        # Create a simple file change
+        test_file = repo_path / "test_array_syntax.md"
+        content = """# Test File for Array Syntax
+
+This file tests multiple versions array syntax parsing.
+"""
+        test_file.write_text(content)
+
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file for array syntax", ["test_array_syntax.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+
+        # Create PR with array YAML values in description
+        pr_body = """This PR tests multiple versions array syntax support.
+
+```yaml
+release: ["2.0", "2.1"]
+backport: ["1.4", "1.5"]
+```
+
+This validates the implementation of issue #358."""
+
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR with array syntax for multiple versions",
+            pr_body,
+            branch_name,
+        )
+
+        # Wait for all labels to be added
+        expected_labels = ["release-2.0", "release-2.1", "backport-1.4", "backport-1.5"]
+        labels_added = {}
+        
+        for label in expected_labels:
+            labels_added[label] = integration_manager.poll_until_condition(
+                lambda l=label: integration_manager.pr_has_label(repo_path, pr_number, l),
+                timeout=60,
+                poll_interval=5,
+            )
+
+        # Assert all labels were added
+        for label, added in labels_added.items():
+            assert added, f"Label '{label}' was not added to PR #{pr_number}"
+
+        # Verify the labels are indeed present
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        for label in expected_labels:
+            assert label in labels, (
+                f"Expected '{label}' label on PR #{pr_number}, but got: {labels}"
+            )
+
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
+
+    def test_mixed_valid_invalid_array_values(self, test_repo, integration_manager):
+        """Test that PR with mixed valid/invalid array values handles errors correctly.
+
+        This test validates error handling for arrays with some invalid values.
+        
+        Steps:
+        1. Create a new branch
+        2. Create a simple file change
+        3. Commit and push changes
+        4. Create PR with mixed valid/invalid array YAML values
+        5. Wait for validation error to be posted
+        6. Verify error comment is present and correct
+        7. Cleanup PR
+        """
+        repo_path = test_repo
+
+        # Ensure only some required labels exist (making others invalid)
+        integration_manager.create_label(
+            repo_path, "release-2.0", "FF0000", "Release 2.0"
+        )
+        integration_manager.create_label(
+            repo_path, "backport-1.4", "00FF00", "Backport to 1.4"
+        )
+
+        # Create a new branch
+        branch_name = f"test-mixed-array-{int(time.time())}"
+        integration_manager.create_branch(repo_path, branch_name)
+
+        # Create a simple file change
+        test_file = repo_path / "test_mixed_array.md"
+        content = """# Test File for Mixed Array Values
+
+This file tests error handling for mixed valid/invalid array values.
+"""
+        test_file.write_text(content)
+
+        # Commit and push changes
+        integration_manager.git_commit_and_push(
+            repo_path, "Add test file for mixed array values", ["test_mixed_array.md"]
+        )
+        integration_manager.push_branch(repo_path, branch_name)
+
+        # Create PR with mixed valid/invalid array values
+        pr_body = """This PR tests error handling for mixed valid/invalid array values.
+
+```yaml
+release: ["2.0", "invalid-version"]
+backport: ["1.4", "another-invalid"]
+```
+
+This should trigger validation errors for the invalid values."""
+
+        pr_number = integration_manager.create_pr(
+            repo_path,
+            "Test PR with mixed valid/invalid array values",
+            pr_body,
+            branch_name,
+        )
+
+        # Wait for error comment to appear
+        error_comment_found = integration_manager.poll_until_condition(
+            lambda: integration_manager.pr_has_comment_containing(
+                repo_path, pr_number, "YAML Validation Error: release and backport"
+            ),
+            timeout=60,
+            poll_interval=5,
+        )
+
+        assert error_comment_found, f"Expected validation error comment on PR #{pr_number}"
+
+        # Check that no labels were added due to the validation errors
+        labels = integration_manager.get_pr_labels(repo_path, pr_number)
+        release_labels = [l for l in labels if l.startswith('release-')]
+        backport_labels = [l for l in labels if l.startswith('backport-')]
+        
+        assert len(release_labels) == 0, f"Expected no release labels due to validation error, but found: {release_labels}"
+        assert len(backport_labels) == 0, f"Expected no backport labels due to validation error, but found: {backport_labels}"
+
+        # Cleanup PR
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)
