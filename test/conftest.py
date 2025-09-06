@@ -75,8 +75,12 @@ This file contains random data, used for PR testing.
     def setup_repository_secrets(self, repo_config: RepositoryConfig) -> bool:
         """Set up GitHub Actions secrets for the repository.
         
+        This method sets up CUSTOM_GITHUB_TOKEN secret on the target repository.
+        For fork-based testing, this should be called on the MAIN repository only,
+        as workflows run in the main repository context when PRs come from forks.
+        
         Args:
-            repo_config: Repository configuration
+            repo_config: Repository configuration (should be main repo for fork testing)
             
         Returns:
             bool: True if secrets were set up successfully
@@ -98,11 +102,11 @@ This file contains random data, used for PR testing.
             return False
         
         try:
-            # Set GITHUB_TOKEN_AUTOMATION as a repository secret for workflow testing
-            print(f"Setting up GITHUB_TOKEN_AUTOMATION secret for {repo_config.full_name}...")
+            # Set CUSTOM_GITHUB_TOKEN as a repository secret for workflow testing
+            print(f"Setting up CUSTOM_GITHUB_TOKEN secret for {repo_config.full_name}...")
             result = subprocess.run(
                 [
-                    "gh", "secret", "set", "GITHUB_TOKEN_AUTOMATION",
+                    "gh", "secret", "set", "CUSTOM_GITHUB_TOKEN",
                     "--repo", repo_config.full_name,
                     "--body", github_token
                 ],
@@ -111,7 +115,7 @@ This file contains random data, used for PR testing.
                 check=True
             )
             
-            print(f"✅ Successfully set GITHUB_TOKEN_AUTOMATION secret for {repo_config.full_name}")
+            print(f"✅ Successfully set CUSTOM_GITHUB_TOKEN secret for {repo_config.full_name}")
             return True
             
         except subprocess.CalledProcessError as e:
@@ -214,6 +218,175 @@ This file contains random data, used for PR testing.
 
         return clone_path
 
+    def generate_trigger_workflow(self, repo_config: RepositoryConfig) -> str:
+        """Generate the trigger workflow YAML content for fork compatibility.
+        
+        This workflow collects PR/issue metadata with minimal permissions
+        and triggers the main workflow via workflow_run.
+        
+        Args:
+            repo_config: Target repository configuration
+            
+        Returns:
+            str: Generated trigger workflow YAML content
+        """
+        workflow_content = f"""---
+name: "Repository Automation: Trigger"
+# This workflow collects PR/issue metadata for external contributors (forks)
+# It runs with minimal permissions and uploads data for the main automation workflow
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled]
+  pull_request:
+    types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
+
+# No special permissions required - this runs on forks with default GITHUB_TOKEN
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  collect-metadata:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Collect PR Metadata
+        if: github.event_name == 'pull_request'
+        id: collect-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            
+            // Collect comprehensive PR metadata
+            const metadata = {{
+              type: 'pull_request',
+              event_action: context.payload.action,
+              number: pr.number,
+              title: pr.title,
+              body: pr.body || '',
+              state: pr.state,
+              draft: pr.draft,
+              head: {{
+                ref: pr.head.ref,
+                sha: pr.head.sha,
+                repo: {{
+                  name: pr.head.repo.name,
+                  owner: pr.head.repo.owner.login,
+                  full_name: pr.head.repo.full_name
+                }}
+              }},
+              base: {{
+                ref: pr.base.ref,
+                sha: pr.base.sha,
+                repo: {{
+                  name: pr.base.repo.name,
+                  owner: pr.base.repo.owner.login,
+                  full_name: pr.base.repo.full_name
+                }}
+              }},
+              labels: pr.labels.map(label => ({{
+                name: label.name,
+                color: label.color,
+                description: label.description
+              }})),
+              author: {{
+                login: pr.user.login,
+                id: pr.user.id
+              }},
+              created_at: pr.created_at,
+              updated_at: pr.updated_at,
+              is_cross_repository: pr.head.repo.full_name !== pr.base.repo.full_name
+            }};
+            
+            // Store metadata as output
+            core.setOutput('metadata', JSON.stringify(metadata));
+            
+            console.log(`📋 Collected PR #${{pr.number}} metadata:`);
+            console.log(`   Title: ${{pr.title}}`);
+            console.log(`   Author: ${{pr.user.login}}`);
+            console.log(`   Head: ${{pr.head.repo.full_name}}:${{pr.head.ref}}`);
+            console.log(`   Base: ${{pr.base.repo.full_name}}:${{pr.base.ref}}`);
+            console.log(`   Labels: ${{pr.labels.map(l => l.name).join(', ') || 'none'}}`);
+            console.log(`   Cross-repo: ${{pr.head.repo.full_name !== pr.base.repo.full_name}}`);
+
+      - name: Collect Issue Metadata
+        if: github.event_name == 'issues'
+        id: collect-issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            
+            // Collect comprehensive issue metadata
+            const metadata = {{
+              type: 'issue',
+              event_action: context.payload.action,
+              number: issue.number,
+              title: issue.title,
+              body: issue.body || '',
+              state: issue.state,
+              labels: issue.labels.map(label => ({{
+                name: label.name,
+                color: label.color,
+                description: label.description
+              }})),
+              author: {{
+                login: issue.user.login,
+                id: issue.user.id
+              }},
+              created_at: issue.created_at,
+              updated_at: issue.updated_at
+            }};
+            
+            // Store metadata as output
+            core.setOutput('metadata', JSON.stringify(metadata));
+            
+            console.log(`📋 Collected Issue #${{issue.number}} metadata:`);
+            console.log(`   Title: ${{issue.title}}`);
+            console.log(`   Author: ${{issue.user.login}}`);
+            console.log(`   Labels: ${{issue.labels.map(l => l.name).join(', ') || 'none'}}`);
+
+      - name: Create Metadata File
+        env:
+          METADATA: ${{{{ steps.collect-pr.outputs.metadata || steps.collect-issue.outputs.metadata }}}}
+        run: |
+          echo "$METADATA" > metadata.json
+          echo "📦 Created metadata file for artifact upload"
+
+      - name: Store Metadata as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-metadata
+          path: metadata.json
+          retention-days: 1
+
+      - name: Summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const eventType = context.eventName;
+            const action = context.payload.action;
+            const number = context.payload.pull_request?.number || context.payload.issue?.number;
+            
+            console.log(`✅ Trigger workflow completed successfully`);
+            console.log(`📊 Event: ${{eventType}}.${{action}}`);
+            console.log(`🔢 Number: ${{number}}`);
+            console.log(`🎯 Next: Main repository will process this via workflow_run event`);
+            
+            // Set job summary
+            await core.summary
+              .addHeading('🚀 Repository Automation: Trigger')
+              .addRaw(`Successfully collected metadata for ${{eventType}} #${{number}}`)
+              .addRaw(`\\n\\n**Event**: \\`${{eventType}}.${{action}}\\``)
+              .addRaw(`\\n**Repository**: \\`${{context.repo.owner}}/${{context.repo.repo}}\\``)
+              .addRaw('\\n\\n**Next Step**: Main repository automation will process this data via `workflow_run` event.')
+              .write();
+"""
+        return workflow_content
+
     def generate_example_workflow(self, repo_config: RepositoryConfig) -> str:
         """Generate a clean example workflow from comprehensive-usage.yml for the test repository.
         
@@ -232,12 +405,8 @@ This file contains random data, used for PR testing.
 
 name: Complete Repository Automation
 on:
-  issues:
-    types: [opened, labeled, unlabeled]
-  pull_request:
-    types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
   workflow_run:
-    workflows: ["Keeper: trigger"]
+    workflows: ["Repository Automation: Trigger"]
     types: [completed]
   schedule:
     - cron: '0 2 * * *'  # Daily at 2 AM UTC for stale detection
@@ -334,16 +503,21 @@ jobs:
                 shutil.copytree(examples_dir, temp_init_path / "examples")
                 print(f"Copied examples/ directory for GitHub Action testing")
             
-            # Generate example workflow for test repository instead of copying internal workflows
+            # Generate example workflows for test repository instead of copying internal workflows
             workflows_staging = temp_init_path / "_workflows_staging"
             workflows_staging.mkdir(parents=True)
             
-            # Generate clean example workflow from comprehensive-usage.yml
-            example_workflow_content = self.generate_example_workflow(repo_config)
-            example_workflow_path = workflows_staging / "repository-automation.yml"
-            example_workflow_path.write_text(example_workflow_content)
+            # Generate trigger workflow for fork compatibility
+            trigger_workflow_content = self.generate_trigger_workflow(repo_config)
+            trigger_workflow_path = workflows_staging / "repository-automation-trigger.yml"
+            trigger_workflow_path.write_text(trigger_workflow_content)
+            print(f"Generated trigger workflow: repository-automation-trigger.yml for {repo_config.full_name}")
             
-            print(f"Generated example workflow: repository-automation.yml for {repo_config.full_name}")
+            # Generate main automation workflow (only triggered by workflow_run)
+            main_workflow_content = self.generate_example_workflow(repo_config)
+            main_workflow_path = workflows_staging / "repository-automation.yml"
+            main_workflow_path.write_text(main_workflow_content)
+            print(f"Generated main workflow: repository-automation.yml for {repo_config.full_name}")
             
             # Get GITHUB_TOKEN for authenticated push
             github_token = os.getenv("GITHUB_TOKEN")
@@ -1582,19 +1756,22 @@ class GitHubFixtures:
                         # Perform the actual initialization
                         success = manager.initialize_test_repository(config.primary_repo)
                         if success:
-                            # Set up repository secrets after successful initialization
-                            manager.setup_repository_secrets(config.primary_repo)
-                            
                             # Set up organization test environment if fork repo is configured
                             if config.fork_repo:
                                 print("Setting up organization test environment with fork repository...")
                                 # Initialize fork repository as well
                                 fork_success = manager.initialize_test_repository(config.fork_repo)
                                 if fork_success:
-                                    manager.setup_repository_secrets(config.fork_repo)
                                     print("✅ Fork repository initialization completed successfully")
+                                    # Set up secrets on main repository for fork-based testing
+                                    # (workflows run in main repo context when PRs come from forks)
+                                    print("Setting up secrets on main repository for fork-based workflow testing...")
+                                    manager.setup_repository_secrets(config.primary_repo)
                                 else:
                                     print("⚠️ Fork repository initialization failed, continuing with primary repo only")
+                            else:
+                                print("Fork repository not configured, skipping secrets setup")
+                                print("💡 Secrets are only needed for fork-based testing workflows")
                             
                             # Signal completion to other workers
                             complete_file_path.write_text("initialized")
