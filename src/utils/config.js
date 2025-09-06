@@ -223,12 +223,16 @@ class ConfigManager {
   }
 
   /**
-   * Parse array value from YAML content (handles JSON array syntax)
+   * Parse array value from YAML content (handles JSON array syntax with mixed quotes)
    */
   parseYamlArrayValue(arrayString) {
     try {
+      // Normalize quotes for JSON parsing - convert single quotes to double quotes
+      // but preserve strings that are already properly quoted
+      const normalizedString = arrayString.replace(/'([^']*)'/g, '"$1"');
+      
       // Parse as JSON array
-      const parsed = JSON.parse(arrayString);
+      const parsed = JSON.parse(normalizedString);
       
       // Ensure it's an array and contains only strings
       if (Array.isArray(parsed)) {

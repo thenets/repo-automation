@@ -44,14 +44,108 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Collect PR Metadata (direct events)
+      if: github.event_name == 'pull_request'
+      shell: bash
+      run: |
+        echo "📋 Collecting PR metadata for direct event"
+        mkdir -p ./pr-metadata
+        cat > ./pr-metadata/metadata.json << 'EOF'
+        {
+          "type": "pull_request",
+          "event_action": "${{ github.event.action }}",
+          "number": ${{ github.event.number }},
+          "title": "${{ github.event.pull_request.title }}",
+          "body": "${{ github.event.pull_request.body }}",
+          "state": "${{ github.event.pull_request.state }}",
+          "draft": ${{ github.event.pull_request.draft }},
+          "head": {
+            "ref": "${{ github.event.pull_request.head.ref }}",
+            "sha": "${{ github.event.pull_request.head.sha }}",
+            "repo": {
+              "name": "${{ github.event.pull_request.head.repo.name }}",
+              "owner": "${{ github.event.pull_request.head.repo.owner.login }}",
+              "full_name": "${{ github.event.pull_request.head.repo.full_name }}"
+            }
+          },
+          "base": {
+            "ref": "${{ github.event.pull_request.base.ref }}",
+            "sha": "${{ github.event.pull_request.base.sha }}",
+            "repo": {
+              "name": "${{ github.event.pull_request.base.repo.name }}",
+              "owner": "${{ github.event.pull_request.base.repo.owner.login }}",
+              "full_name": "${{ github.event.pull_request.base.repo.full_name }}"
+            }
+          },
+          "author": {
+            "login": "${{ github.event.pull_request.user.login }}",
+            "id": ${{ github.event.pull_request.user.id }}
+          },
+          "created_at": "${{ github.event.pull_request.created_at }}",
+          "updated_at": "${{ github.event.pull_request.updated_at }}",
+          "is_cross_repository": "${{ github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name }}"
+        }
+        EOF
+        echo "✅ PR metadata collected and stored"
+
+    - name: Collect Issue Metadata (direct events)
+      if: github.event_name == 'issues'
+      shell: bash
+      run: |
+        echo "📋 Collecting issue metadata for direct event"
+        mkdir -p ./pr-metadata
+        cat > ./pr-metadata/metadata.json << 'EOF'
+        {
+          "type": "issue",
+          "event_action": "${{ github.event.action }}",
+          "number": ${{ github.event.number }},
+          "title": "${{ github.event.issue.title }}",
+          "body": "${{ github.event.issue.body }}",
+          "state": "${{ github.event.issue.state }}",
+          "author": {
+            "login": "${{ github.event.issue.user.login }}",
+            "id": ${{ github.event.issue.user.id }}
+          },
+          "created_at": "${{ github.event.issue.created_at }}",
+          "updated_at": "${{ github.event.issue.updated_at }}"
+        }
+        EOF
+        echo "✅ Issue metadata collected and stored"
+
     - name: Download Artifact (if workflow_run)
       if: github.event_name == 'workflow_run'
+      continue-on-error: true
       uses: actions/download-artifact@v5
       with:
         github-token: ${{ inputs.custom-github-token || inputs.github-token }}
         run-id: ${{ github.event.workflow_run.id }}
         name: pr-metadata
         path: ./pr-metadata
+
+    - name: Create Fallback Metadata (if workflow_run without artifact)
+      if: github.event_name == 'workflow_run'
+      shell: bash
+      run: |
+        if [ ! -f ./pr-metadata/metadata.json ]; then
+          echo "📋 Creating fallback metadata for workflow_run event"
+          mkdir -p ./pr-metadata
+          cat > ./pr-metadata/metadata.json << 'EOF'
+        {
+          "type": "workflow_run",
+          "event_action": "completed",
+          "number": "N/A",
+          "title": "${{ github.event.workflow_run.display_title }}",
+          "body": "Triggered by workflow_run event",
+          "head_branch": "${{ github.event.workflow_run.head_branch }}",
+          "head_sha": "${{ github.event.workflow_run.head_sha }}",
+          "workflow_name": "${{ github.event.workflow_run.name }}",
+          "conclusion": "${{ github.event.workflow_run.conclusion }}"
+        }
+        EOF
+          echo "✅ Fallback metadata created for workflow_run event"
+        else
+          echo "✅ Artifact metadata found, using existing data"
+        fi
 
     - name: Run Triage Automation
       uses: actions/github-script@v7
@@ -91,3 +185,54 @@ runs:
             console.error('❌ Triage automation failed:', error.message);
             throw error;
           }
+
+    - name: Generate Summary
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.custom-github-token || inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          const eventType = context.eventName;
+          const action = context.payload.action || 'none';
+          let number = context.payload.pull_request?.number || context.payload.issue?.number || 'N/A';
+          let targetType = eventType === 'issues' ? 'Issue' : 'PR';
+          
+          // For workflow_run events, try to get the PR number from artifact metadata
+          if (eventType === 'workflow_run') {
+            try {
+              const metadataPath = path.join('./pr-metadata', 'metadata.json');
+              if (fs.existsSync(metadataPath)) {
+                const metadataContent = fs.readFileSync(metadataPath, 'utf8');
+                const metadata = JSON.parse(metadataContent);
+                if (metadata && metadata.number) {
+                  number = metadata.number;
+                  targetType = metadata.type === 'issue' ? 'Issue' : 'PR';
+                }
+              }
+            } catch (error) {
+              console.log('Could not load metadata for summary:', error.message);
+            }
+          }
+          
+          console.log(`📊 Repository Automation Summary`);
+          console.log(`Event: ${eventType}.${action}`);
+          console.log(`Number: ${number}`);
+          console.log(`Repository: ${context.repo.owner}/${context.repo.repo}`);
+          
+          if (eventType === 'workflow_run') {
+            const workflowRun = context.payload.workflow_run;
+            console.log(`Triggered by: ${workflowRun.name}`);
+            console.log(`Head branch: ${workflowRun.head_branch}`);
+            console.log(`Conclusion: ${workflowRun.conclusion}`);
+          }
+          
+          // Create proper markdown summary
+          let summaryContent = `# 🤖 Repository Automation Complete\n\n`;
+          summaryContent += `- **Event**: \`${eventType}.${action}\`\n`;
+          summaryContent += `- **Target**: ${targetType} #${number}\n`;
+          summaryContent += `- **Repository**: \`${context.repo.owner}/${context.repo.repo}\`\n`;
+          summaryContent += `- **Source**: ${eventType === 'workflow_run' ? 'Fork trigger workflow' : `Direct ${eventType} event`}\n`;
+          
+          await core.summary.addRaw(summaryContent).write();

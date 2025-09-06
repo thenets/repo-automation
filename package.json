@@ -1,0 +1,42 @@
+{
+  "name": "github-repo-automations",
+  "version": "0.1.0",
+  "description": "GitHub Actions workflows for repository automation",
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@types/node": "^20.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/test/unit/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/node_modules/**"
+    ],
+    "coverageDirectory": "coverage-unit",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/unit/setup.js"
+    ]
+  },
+  "keywords": [
+    "github",
+    "automation",
+    "workflow",
+    "actions"
+  ],
+  "author": "Repository Automation Team",
+  "license": "MIT"
+}

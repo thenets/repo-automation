@@ -285,22 +285,15 @@ This file contains random data, used for PR testing.
             testing_file_path.write_text(testing_content)
             print(f"Created TESTING.md for PR testing")
             
-            # Copy GitHub Action files (action.yml and src/ directory)
-            action_file = current_repo / "action.yml"
-            if action_file.exists():
-                shutil.copy2(action_file, temp_init_path / "action.yml")
-                print(f"Copied action.yml for GitHub Action testing")
+            # NOTE: No longer copying action.yml and src/ directory since we now use reusable workflows
+            # The test repository should consume workflows remotely without needing local source files
+            print(f"Using reusable workflow approach - no local action.yml or src/ needed")
             
-            src_dir = current_repo / "src"
-            if src_dir.exists():
-                shutil.copytree(src_dir, temp_init_path / "src")
-                print(f"Copied src/ directory for GitHub Action testing")
             
-            # Copy examples directory
-            examples_dir = current_repo / "examples"
-            if examples_dir.exists():
-                shutil.copytree(examples_dir, temp_init_path / "examples")
-                print(f"Copied examples/ directory for GitHub Action testing")
+            # NOTE: No longer copying reusable workflows to test repository
+            # The test repository should only have consumer workflows that call the reusable workflows
+            # The reusable workflows remain in the main repository (thenets/repo-automation)
+            print(f"Test repository will use consumer workflows that reference remote reusable workflows")
             
             # Generate example workflows for test repository instead of copying internal workflows
             workflows_staging = temp_init_path / "_workflows_staging"
@@ -324,8 +317,9 @@ This file contains random data, used for PR testing.
                 raise RepositoryError("GITHUB_TOKEN environment variable is required for repository initialization")
             
             # Add and commit essential files (workflows staged separately)
-            subprocess.run(["git", "add", "TESTING.md", "action.yml", "src/", "examples/"], cwd=temp_init_path, check=True)
-            subprocess.run(["git", "commit", "-m", "Initial commit - testing files and GitHub Action"], cwd=temp_init_path, check=True)
+            # Note: No longer adding action.yml, src/, or .github/ in first commit since we use reusable workflows
+            subprocess.run(["git", "add", "TESTING.md"], cwd=temp_init_path, check=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit - testing files"], cwd=temp_init_path, check=True)
             
             # Add remote pointing to test repository with token authentication
             test_repo_url = f"https://{github_token}@github.com/{repo_config.full_name}.git"

@@ -30,9 +30,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-**Complete Automation (Fork-Compatible Two-Workflow Pattern):**
+**Complete Automation (Reusable Workflow Pattern):**
 
-Create two workflows for fork compatibility:
+Create two workflows for fork compatibility using reusable workflows:
 
 *1. Trigger Workflow (`repository-automation-trigger.yml`):*
 ```yaml
@@ -43,21 +43,9 @@ on:
   pull_request:
     types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
 
-permissions:
-  contents: read
-  pull-requests: read
-  issues: read
-
 jobs:
-  collect-metadata:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Collect PR/Issue Metadata
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // Collects metadata and stores as artifact
-            // See test/templates/repository-automation-trigger.yml for full implementation
+  trigger:
+    uses: thenets/repo-automation/.github/workflows/triage-automation-trigger.yml@main
 ```
 
 *2. Main Automation Workflow (`repository-automation.yml`):*
@@ -70,25 +58,25 @@ on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
-
-permissions:
-  issues: write
-  pull-requests: write
-  checks: write
+    inputs:
+      dry-run:
+        description: 'Dry run mode (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   automation:
-    runs-on: ubuntu-latest
     if: github.repository == 'your-org/your-repo'
-    steps:
-      - uses: thenets/repo-automation@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
-          accepted-releases: '["1.0", "2.0", "devel"]'
-          accepted-backports: '["1.0", "2.0"]'
-          enable-feature-branch: true
-          stale-days: 1
+    uses: thenets/repo-automation/.github/workflows/triage-automation.yml@main
+    with:
+      dry-run: ${{ github.event.inputs.dry-run || 'false' }}
+      accepted-releases: '["1.0", "2.0", "devel"]'
+      accepted-backports: '["1.0", "2.0"]'
+      enable-feature-branch: true
+      stale-days: 1
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CUSTOM_GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
 ```
 
 ### Features Auto-Enabled by Inputs
@@ -99,7 +87,8 @@ jobs:
 - **Stale Detection**: Enabled when `stale-days` provided or `schedule` event
 
 **Benefits:**
-- ✅ **98%+ Code Reduction**: From ~1,500 lines to ~20 lines
+- ✅ **99%+ Code Reduction**: From ~1,500 lines to ~10 lines per workflow
+- ✅ **Remote Action Module**: No need to copy source files - just reference workflows
 - ✅ **Feature-Based Design**: No automation types - features activate based on inputs
 - ✅ **No hardcoded repository references** - works with any repository
 - ✅ **Automatic updates** when you pin to a version
@@ -126,24 +115,29 @@ jobs:
 
 ## 🎉 Current Implementation Structure
 
-**Workflow Templates** (for deployment to target repositories):
-```
-test/templates/
-├── repository-automation-trigger.yml   # 🔄 Fork-compatible metadata collection
-└── repository-automation.yml          # 🚀 Main automation using GitHub Action
-```
-
-**This Repository's Workflows**:
+**Reusable Workflows** (consumed remotely by target repositories):
 ```
 .github/workflows/
-├── dependabot-auto-merge.yml           # 🤖 Dependabot automation
-└── [minimal workflows for this repo]
+├── triage-automation-trigger.yml      # 🔄 Fork-compatible metadata collection
+├── triage-automation.yml              # 🚀 Main automation workflow
+└── dependabot-auto-merge.yml          # 🤖 Dependabot automation
 ```
 
-**Two-Workflow Pattern Benefits:**
+**Action Definition**:
+```
+action.yml                             # 📦 GitHub Action with src/ modules
+src/
+├── triage-management.js               # 🎯 Core triage automation logic
+├── label-automation.js                # 🏷️  Label management functionality
+└── utils/                             # 🛠️  Shared utilities
+```
+
+**Remote Action Module Benefits:**
+- ✅ **No File Copying**: Workflows consumed directly from this repository
+- ✅ **Automatic Updates**: Changes propagate to all consuming repositories
 - ✅ **Fork Compatible**: External contributors can trigger automation
 - ✅ **Secure**: Secrets only accessed in main repository workflow
-- ✅ **Reliable**: Metadata collection works without elevated permissions
+- ✅ **Centralized**: All logic maintained in single location
 
 ## 🎉 Migration Complete - This Repository as Reference
 
@@ -157,20 +151,28 @@ This repository serves as a **real-world migration example**:
 - **After**: 1 unified workflow using the action (79 lines)  
 - **Result**: 95% code reduction + simplified maintenance
 
-**Template Files Available:**
-- `test/templates/repository-automation-trigger.yml` - Fork-compatible metadata collection
-- `test/templates/repository-automation.yml` - Main automation workflow using the action
+**Template Files Available** (Legacy - use reusable workflows instead):
+- `test/templates/repository-automation-trigger.yml` - Fork-compatible metadata collection (Legacy)
+- `test/templates/repository-automation.yml` - Main automation workflow using the action (Legacy)
 - `examples/comprehensive-usage.yml` - Complete configuration examples
+
+> ⚠️ **Template files are now legacy**. Use the reusable workflow approach instead for easier maintenance and automatic updates.
 
 ### Migration Guide for Your Repository
 
-To set up repository automation using the two-workflow pattern:
+To set up repository automation using the reusable workflow pattern:
 
-1. **Copy** `test/templates/repository-automation-trigger.yml` to your `.github/workflows/` directory
-2. **Copy** `test/templates/repository-automation.yml` to your `.github/workflows/` directory
-3. **Update** the repository reference in the main workflow: `if: github.repository == 'your-org/your-repo'`
-4. **Configure** features using action inputs in the main workflow
+1. **Create** `repository-automation-trigger.yml` with the reusable workflow reference (see Quick Start above)
+2. **Create** `repository-automation.yml` with the reusable workflow reference (see Quick Start above)
+3. **Update** the repository reference: `if: github.repository == 'your-org/your-repo'`
+4. **Configure** features using workflow inputs
 5. **Test** using dry-run mode first
+
+**Key Changes from Template Approach:**
+- ✅ **No file copying required** - workflows are consumed remotely
+- ✅ **Automatic updates** when thenets/repo-automation is updated
+- ✅ **Simplified maintenance** - no local source files to maintain
+- ✅ **Consistent behavior** across all consuming repositories
 
 ### Legacy Documentation (Historical Reference)
 

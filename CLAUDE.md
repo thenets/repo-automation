@@ -98,9 +98,10 @@ permissions:
 3. Update documentation if behavior changes
 
 ### Debugging Workflows
-- Check GitHub Actions logs in the repository
-- Verify webhook events are triggering correctly
-- Ensure labels exist in repository settings
+- Use `gh run list --repo OWNER/REPO` to check GitHub Actions logs
+- Use `gh run view RUN_ID --repo OWNER/REPO` for detailed log investigation
+- Use `gh repo view OWNER/REPO` to verify webhook events and repository settings
+- Use `gh label list --repo OWNER/REPO` to ensure required labels exist
 
 ## Repository Setup Requirements
 
@@ -111,6 +112,150 @@ permissions:
 3. **Permissions**: Verify Actions have appropriate permissions
 4. **Branch Protection**: Consider if workflows need to run on protected branches
 5. **Repository Restriction**: Update `if: github.repository == 'your-org/your-repo'` in all workflows
+
+## Testing and Debugging Workflows
+
+### Investigation Loop for Workflow Failures
+
+When workflows fail, follow this systematic debugging loop using the gh CLI:
+
+```bash
+# 1. Check latest workflow runs in test repository
+gh run list --repo dednets/repo-automation-test --limit 1 --json databaseId,status,conclusion,name,workflowName,createdAt,url
+
+# 2. If failure found, investigate specific run details
+gh run view <RUN_ID> --repo dednets/repo-automation-test --log
+
+# 3. Check recent PRs to understand context
+gh pr list --repo dednets/repo-automation-test --state open --limit 5
+
+# 4. Plan and implement fix, then repeat until workflows work
+```
+
+### Basic Architecture Flow - Fork Repository Testing
+
+```mermaid
+flowchart TD
+    subgraph "1. Source Repository (thenets/repo-automation)"
+        A[GitHub Action Source Code]
+        A1[action.yml]
+        A2[src/ directory]
+        A3[test/templates/]
+        A --> A1
+        A --> A2
+        A --> A3
+    end
+    
+    subgraph "1.1 Development Workflow"
+        B[Make Changes] --> C[Commit & Push]
+        C --> D{Ready for Testing?}
+        D -->|No| B
+        D -->|Yes| E[Run pytest]
+    end
+    
+    subgraph "2. Test Execution (pytest)"
+        E --> F[Initialize Test Repositories]
+        F --> F1[dednets/repo-automation-test]
+        F --> F2[thenets/repo-automation-test - fork]
+        F1 --> G[Deploy Consumer Workflows]
+        F2 --> G
+        G --> H[Create Test PR]
+        H --> I[Wait for Automation]
+    end
+    
+    subgraph "3. GitHub Workflow Execution"
+        I --> J[Trigger: repository-automation-trigger.yml]
+        J --> K[Collect PR Metadata]
+        K --> L[Upload Artifact]
+        L --> M[Main: repository-automation.yml]
+        M --> N[Download Artifact]
+        N --> O[Execute Action: uses: thenets/repo-automation@main]
+        O --> P[Apply Labels]
+    end
+    
+    subgraph "4. Investigation Commands"
+        Q[gh run list --repo dednets/repo-automation-test]
+        R[gh run view RUN_ID --repo dednets/repo-automation-test]
+        S[gh pr view PR_NUMBER --repo dednets/repo-automation-test]
+        T[gh pr list --repo dednets/repo-automation-test]
+    end
+    
+    P --> U{Labels Applied?}
+    U -->|✅ Success| V[Test Passes]
+    U -->|❌ Failure| W[Use Investigation Commands]
+    W --> Q
+    W --> R
+    W --> S
+    W --> T
+    W --> X[Fix Issue]
+    X --> B
+    
+    style A fill:#e1f5fe
+    style E fill:#fff3e0
+    style J fill:#f3e5f5
+    style Q fill:#e8f5e8
+```
+
+### Critical Testing Requirements
+
+**⚠️ IMPORTANT: Changes must be committed and pushed before running pytest**
+
+1. **This repository is the GitHub Action source code**
+   - `action.yml` defines the action interface
+   - `src/` contains the implementation
+   - `test/templates/` contain consumer workflow templates
+
+2. **Any changes must be pushed before testing**
+   ```bash
+   # Always commit and push first
+   git add .
+   git commit -m "your changes"
+   git push origin main
+   
+   # Then run tests
+   ./venv/bin/pytest test/test_basic_functionality.py::TestBasicFunctionality::test_hello -v
+   ```
+
+3. **Use gh CLI for investigation**
+   ```bash
+   # Check workflow runs
+   gh run list --repo dednets/repo-automation-test --limit 5
+   
+   # Investigate failures
+   gh run view <FAILED_RUN_ID> --repo dednets/repo-automation-test
+   
+   # Check PRs and labels
+   gh pr list --repo dednets/repo-automation-test --state open
+   gh pr view <PR_NUMBER> --repo dednets/repo-automation-test
+   ```
+
+### Test Repository Architecture
+
+The test setup creates consumer repositories that use this action:
+
+```yaml
+# Consumer workflow in test repository
+- name: Repository Automation
+  uses: thenets/repo-automation@main  # References THIS repository
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    accepted-releases: '["1.0", "2.0"]'
+```
+
+This ensures end-to-end testing of the GitHub Action in real repository scenarios.
+
+## GitHub CLI Guidelines
+
+**⚠️ ALWAYS use the GitHub CLI (gh) for any GitHub.com interactions**
+
+Instead of visiting GitHub.com in a browser, use these commands:
+- **Repository info**: `gh repo view OWNER/REPO`
+- **Issues**: `gh issue list --repo OWNER/REPO`, `gh issue view NUMBER --repo OWNER/REPO`
+- **Pull requests**: `gh pr list --repo OWNER/REPO`, `gh pr view NUMBER --repo OWNER/REPO`
+- **Workflow runs**: `gh run list --repo OWNER/REPO`, `gh run view RUN_ID --repo OWNER/REPO`
+- **Releases**: `gh release list --repo OWNER/REPO`, `gh release view TAG --repo OWNER/REPO`
+- **Labels**: `gh label list --repo OWNER/REPO`
+- **API access**: `gh api repos/OWNER/REPO/endpoint`
 
 ## Documentation Guidelines
 

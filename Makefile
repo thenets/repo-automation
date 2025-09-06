@@ -53,6 +53,34 @@ test: venv ## Run tests (parallel, up to 10 threads) with coverage
 	@echo "  - HTML: htmlcov/index.html"
 	@echo "  - XML: coverage.xml"
 
+.PHONY: unit-test-setup
+unit-test-setup: ## Install JavaScript dependencies for unit tests
+	@echo "Setting up JavaScript unit test dependencies..."
+	@if command -v npm > /dev/null 2>&1; then \
+		npm install; \
+		echo "✅ JavaScript dependencies installed successfully!"; \
+	else \
+		echo "❌ npm not found. Please install Node.js and npm first."; \
+		echo "💡 You can download Node.js from: https://nodejs.org/"; \
+		exit 1; \
+	fi
+
+.PHONY: test-unit
+test-unit: ## Run JavaScript unit tests for src/ directory
+	@echo "Running JavaScript unit tests..."
+	@if command -v npm > /dev/null 2>&1; then \
+		if [ ! -d "node_modules" ]; then \
+			echo "⚠️  Dependencies not installed. Run 'make unit-test-setup' first."; \
+			exit 1; \
+		fi; \
+		npm test; \
+	else \
+		echo "❌ npm not found. Please install Node.js and npm to run unit tests."; \
+		echo "💡 Run 'make unit-test-setup' to install dependencies."; \
+		exit 1; \
+	fi
+	@echo "Unit tests completed!"
+
 .PHONY: test-list
 test-list: venv ## List all tests
 	./venv/bin/python -m pytest --collect-only
