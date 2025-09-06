@@ -771,7 +771,12 @@ This file contains random data, used for PR testing.
     def git_commit_and_push(
         self, repo_path: Path, message: str, files: Optional[List[str]] = None
     ) -> None:
-        """Add, commit, and push changes to git."""
+        """Add, commit, and push changes to git.
+        
+        When fork testing is configured, this method only commits locally
+        without pushing, as the push will be handled by the fork-specific
+        PR creation workflow.
+        """
         if files:
             for file in files:
                 subprocess.run(["git", "add", file], cwd=repo_path, check=True)
@@ -780,18 +785,21 @@ This file contains random data, used for PR testing.
 
         subprocess.run(["git", "commit", "-m", message], cwd=repo_path, check=True)
 
-        # Get current branch name and push
-        current_branch = subprocess.run(
-            ["git", "branch", "--show-current"],
-            cwd=repo_path,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
+        # Only push if fork testing is NOT configured
+        # Fork testing handles pushes in the fork-specific workflow
+        if not self.config.fork_repo:
+            # Get current branch name and push
+            current_branch = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
 
-        subprocess.run(
-            ["git", "push", "origin", current_branch], cwd=repo_path, check=True
-        )
+            subprocess.run(
+                ["git", "push", "origin", current_branch], cwd=repo_path, check=True
+            )
 
     def create_branch(self, repo_path: Path, branch_name: str) -> None:
         """Create and checkout a new branch."""
@@ -809,10 +817,17 @@ This file contains random data, used for PR testing.
         )
 
     def push_branch(self, repo_path: Path, branch_name: str) -> None:
-        """Push a branch to remote."""
-        subprocess.run(
-            ["git", "push", "-u", "origin", branch_name], cwd=repo_path, check=True
-        )
+        """Push a branch to remote.
+        
+        When fork testing is configured, this method does nothing as
+        pushes are handled by the fork-specific PR creation workflow.
+        """
+        # Only push if fork testing is NOT configured
+        # Fork testing handles pushes in the fork-specific workflow
+        if not self.config.fork_repo:
+            subprocess.run(
+                ["git", "push", "-u", "origin", branch_name], cwd=repo_path, check=True
+            )
 
     def _get_repo_suffix(self, repo_path: Path) -> str:
         """Generate a suffix based on the local repository path."""
