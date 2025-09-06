@@ -611,7 +611,7 @@ Use `keeper-auto-label-release-backport.yml` as your reference template:
 name: "Your New Workflow"
 on:
   workflow_run:
-    workflows: ["Keeper: Trigger Data Collection"]
+    workflows: ["Repository Automation: Trigger"]
     types: [completed]
 
 jobs:
