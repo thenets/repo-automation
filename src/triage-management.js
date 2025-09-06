@@ -68,13 +68,13 @@ class RepositoryAutomation {
       // Store enabled features in result
       this.result.featuresEnabled = Object.keys(this.features).filter(f => this.features[f]);
 
-      // Always run core triage automation
-      await this.executeTriageAutomation();
-      
-      // Run optional features based on inputs and event types
+      // Run optional features first to check for validation errors
       if (this.features.releaseLabeling || this.features.backportLabeling || this.features.featureBranch) {
         await this.executeLabelAutomation();
       }
+      
+      // Run core triage automation after label automation
+      await this.executeTriageAutomation();
       
       if (this.features.staleDetection) {
         await this.executeStaleDetection();
@@ -341,6 +341,12 @@ class RepositoryAutomation {
       const hasReleaseYaml = yamlContent && this.config.parseYamlValue(yamlContent, 'release');
       const hasBackportYaml = yamlContent && this.config.parseYamlValue(yamlContent, 'backport');
 
+      // Check if label automation posted validation error comments (indicating invalid YAML)
+      const hasValidationErrors = this.result.actions.some(action => 
+        action.includes('Posted validation error comment') || 
+        action.includes('validation error comment')
+      );
+
       console.log(`🔍 Label analysis:`);
       console.log(`  - Has release label: ${hasReleaseLabel}`);
       console.log(`  - Has backport label: ${hasBackportLabel}`);
@@ -348,10 +354,17 @@ class RepositoryAutomation {
       console.log(`  - Has ready for review label: ${hasReadyForReviewLabel}`);
       console.log(`  - Has release YAML: ${!!hasReleaseYaml}`);
       console.log(`  - Has backport YAML: ${!!hasBackportYaml}`);
+      console.log(`  - Has validation errors: ${hasValidationErrors}`);
       console.log(`  - Is draft: ${prData.draft}`);
 
-      // Main logic: If PR has release label/YAML and not draft, add ready for review; otherwise add triage
-      if ((hasReleaseLabel || hasReleaseYaml) && !prData.draft) {
+      // Main logic: 
+      // 1. If YAML has validation errors, always add triage label (needs manual review)
+      // 2. If PR has valid release label/YAML and not draft, add ready for review
+      // 3. Otherwise add triage
+      if (hasValidationErrors) {
+        await this.handleTriageLabel(prNumber, hasTriageLabel, false);
+        console.log(`🏷️ Added triage label due to YAML validation errors`);
+      } else if ((hasReleaseLabel || hasReleaseYaml) && !prData.draft) {
         await this.handleReadyForReviewLabel(prNumber, hasReadyForReviewLabel);
       } else if (!hasBackportLabel && !hasBackportYaml) {
         await this.handleTriageLabel(prNumber, hasTriageLabel, hasReleaseLabel || !!hasReleaseYaml);

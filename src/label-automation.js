@@ -413,6 +413,7 @@ class LabelAutomation {
     }
 
     await this.client.createComment(prNumber, errorComment);
+    this.result.actions.push(`Posted validation error comment to PR #${prNumber}`);
     console.log('💬 Posted validation error comment to PR');
   }
 
@@ -450,6 +451,7 @@ class LabelAutomation {
     }
 
     await this.client.createComment(prNumber, errorComment);
+    this.result.actions.push(`Posted validation error comment to PR #${prNumber}`);
     console.log('💬 Posted validation error comment to PR');
   }
 }
