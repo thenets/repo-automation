@@ -219,173 +219,16 @@ This file contains random data, used for PR testing.
         return clone_path
 
     def generate_trigger_workflow(self, repo_config: RepositoryConfig) -> str:
-        """Generate the trigger workflow YAML content for fork compatibility.
-        
-        This workflow collects PR/issue metadata with minimal permissions
-        and triggers the main workflow via workflow_run.
+        """Load the trigger workflow template for fork compatibility.
         
         Args:
             repo_config: Target repository configuration
             
         Returns:
-            str: Generated trigger workflow YAML content
+            str: Trigger workflow YAML content from template
         """
-        workflow_content = f"""---
-name: "Repository Automation: Trigger"
-# This workflow collects PR/issue metadata for external contributors (forks)
-# It runs with minimal permissions and uploads data for the main automation workflow
-
-on:
-  issues:
-    types: [opened, labeled, unlabeled]
-  pull_request:
-    types: [opened, synchronize, edited, ready_for_review, labeled, unlabeled]
-
-# No special permissions required - this runs on forks with default GITHUB_TOKEN
-permissions:
-  contents: read
-  pull-requests: read
-  issues: read
-
-jobs:
-  collect-metadata:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Collect PR Metadata
-        if: github.event_name == 'pull_request'
-        id: collect-pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            
-            // Collect comprehensive PR metadata
-            const metadata = {{
-              type: 'pull_request',
-              event_action: context.payload.action,
-              number: pr.number,
-              title: pr.title,
-              body: pr.body || '',
-              state: pr.state,
-              draft: pr.draft,
-              head: {{
-                ref: pr.head.ref,
-                sha: pr.head.sha,
-                repo: {{
-                  name: pr.head.repo.name,
-                  owner: pr.head.repo.owner.login,
-                  full_name: pr.head.repo.full_name
-                }}
-              }},
-              base: {{
-                ref: pr.base.ref,
-                sha: pr.base.sha,
-                repo: {{
-                  name: pr.base.repo.name,
-                  owner: pr.base.repo.owner.login,
-                  full_name: pr.base.repo.full_name
-                }}
-              }},
-              labels: pr.labels.map(label => ({{
-                name: label.name,
-                color: label.color,
-                description: label.description
-              }})),
-              author: {{
-                login: pr.user.login,
-                id: pr.user.id
-              }},
-              created_at: pr.created_at,
-              updated_at: pr.updated_at,
-              is_cross_repository: pr.head.repo.full_name !== pr.base.repo.full_name
-            }};
-            
-            // Store metadata as output
-            core.setOutput('metadata', JSON.stringify(metadata));
-            
-            console.log(`📋 Collected PR #${{pr.number}} metadata:`);
-            console.log(`   Title: ${{pr.title}}`);
-            console.log(`   Author: ${{pr.user.login}}`);
-            console.log(`   Head: ${{pr.head.repo.full_name}}:${{pr.head.ref}}`);
-            console.log(`   Base: ${{pr.base.repo.full_name}}:${{pr.base.ref}}`);
-            console.log(`   Labels: ${{pr.labels.map(l => l.name).join(', ') || 'none'}}`);
-            console.log(`   Cross-repo: ${{pr.head.repo.full_name !== pr.base.repo.full_name}}`);
-
-      - name: Collect Issue Metadata
-        if: github.event_name == 'issues'
-        id: collect-issue
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = context.payload.issue;
-            
-            // Collect comprehensive issue metadata
-            const metadata = {{
-              type: 'issue',
-              event_action: context.payload.action,
-              number: issue.number,
-              title: issue.title,
-              body: issue.body || '',
-              state: issue.state,
-              labels: issue.labels.map(label => ({{
-                name: label.name,
-                color: label.color,
-                description: label.description
-              }})),
-              author: {{
-                login: issue.user.login,
-                id: issue.user.id
-              }},
-              created_at: issue.created_at,
-              updated_at: issue.updated_at
-            }};
-            
-            // Store metadata as output
-            core.setOutput('metadata', JSON.stringify(metadata));
-            
-            console.log(`📋 Collected Issue #${{issue.number}} metadata:`);
-            console.log(`   Title: ${{issue.title}}`);
-            console.log(`   Author: ${{issue.user.login}}`);
-            console.log(`   Labels: ${{issue.labels.map(l => l.name).join(', ') || 'none'}}`);
-
-      - name: Create Metadata File
-        env:
-          METADATA: ${{{{ steps.collect-pr.outputs.metadata || steps.collect-issue.outputs.metadata }}}}
-        run: |
-          echo "$METADATA" > metadata.json
-          echo "📦 Created metadata file for artifact upload"
-
-      - name: Store Metadata as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr-metadata
-          path: metadata.json
-          retention-days: 1
-
-      - name: Summary
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const eventType = context.eventName;
-            const action = context.payload.action;
-            const number = context.payload.pull_request?.number || context.payload.issue?.number;
-            
-            console.log(`✅ Trigger workflow completed successfully`);
-            console.log(`📊 Event: ${{eventType}}.${{action}}`);
-            console.log(`🔢 Number: ${{number}}`);
-            console.log(`🎯 Next: Main repository will process this via workflow_run event`);
-            
-            // Set job summary
-            await core.summary
-              .addHeading('🚀 Repository Automation: Trigger')
-              .addRaw(`Successfully collected metadata for ${{eventType}} #${{number}}`)
-              .addRaw(`\\n\\n**Event**: \\`${{eventType}}.${{action}}\\``)
-              .addRaw(`\\n**Repository**: \\`${{context.repo.owner}}/${{context.repo.repo}}\\``)
-              .addRaw('\\n\\n**Next Step**: Main repository automation will process this data via `workflow_run` event.')
-              .write();
-"""
-        return workflow_content
+        template_path = Path(__file__).parent / "templates" / "repository-automation-trigger.yml"
+        return template_path.read_text()
 
     def generate_example_workflow(self, repo_config: RepositoryConfig) -> str:
         """Generate a clean example workflow from comprehensive-usage.yml for the test repository.
@@ -396,53 +239,9 @@ jobs:
         Returns:
             str: Generated workflow YAML content
         """
-        # Use the actual action repository for testing since test repo doesn't contain action files
-        action_reference = "thenets/repo-automation@main"  # Reference to the actual action
-        
-        workflow_content = f"""---
-# Complete Repository Automation - Generated from examples/comprehensive-usage.yml
-# This workflow demonstrates the unified GitHub Action replacing 4 individual keeper workflows
-
-name: Complete Repository Automation
-on:
-  workflow_run:
-    workflows: ["Repository Automation: Trigger"]
-    types: [completed]
-  schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC for stale detection
-  workflow_dispatch:  # Manual trigger for testing
-
-permissions:
-  issues: write
-  pull-requests: write
-  checks: write
-
-jobs:
-  repository-automation:
-    runs-on: ubuntu-latest
-    if: github.repository == '{repo_config.full_name}'
-    
-    steps:
-      - name: Complete Repository Automation
-        uses: {action_reference}
-        with:
-          github-token: ${{{{ secrets.GITHUB_TOKEN }}}}
-          custom-github-token: ${{{{ secrets.CUSTOM_GITHUB_TOKEN }}}}
-          
-          # Stale detection configuration (enables stale detection)
-          stale-days: 1
-          
-          # Release/backport labeling configuration (enables auto-labeling)
-          accepted-releases: '["1.0", "1.1", "1.2", "2.0", "2.1", "devel"]'
-          accepted-backports: '["1.0", "1.1", "1.2", "2.0", "2.1", "2.2"]'
-          
-          # Feature branch automation (enables feature branch labeling)
-          enable-feature-branch: true
-          
-          # Optional: dry-run mode for testing
-          dry-run: false
-"""
-        return workflow_content
+        # Load template for test repository
+        template_path = Path(__file__).parent / "templates" / "repository-automation.yml"
+        return template_path.read_text()
 
     def initialize_test_repository(self, repo_config: RepositoryConfig) -> bool:
         """Initialize test repository with current source code by force-pushing from current repo.

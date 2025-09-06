@@ -1,17 +1,11 @@
 ---
-name: Repository Automation
+name: Complete Repository Automation
 # Fork-compatible automation for repository triage, labeling, and management
 
 on:
-  # Direct events for internal contributors
-  issues:
-    types: [opened, labeled, unlabeled]
-  pull_request:
-    types: [opened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
-  
-  # Fork compatibility via workflow_run (triggered by keeper-trigger.yml)
+  # Fork compatibility via workflow_run (triggered by repository-automation-trigger.yml)
   workflow_run:
-    workflows: ["Keeper: Trigger Data Collection"]
+    workflows: ["Repository Automation: Trigger"]
     types: [completed]
   
   # Scheduled events for stale detection
