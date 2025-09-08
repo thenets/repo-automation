@@ -254,22 +254,132 @@ class RepositoryAutomation {
   }
 
   /**
-   * Sanitize JSON content to fix common issues
+   * Sanitize JSON content to fix common issues in specific fields
    */
   sanitizeJsonContent(content) {
     try {
-      // Replace literal newlines with escaped newlines
-      let sanitized = content.replace(/\n/g, '\\n');
-      // Replace literal tabs with escaped tabs  
-      sanitized = sanitized.replace(/\t/g, '\\t');
-      // Replace literal carriage returns with escaped ones
-      sanitized = sanitized.replace(/\r/g, '\\r');
-      // Fix any double quotes that aren't properly escaped
-      sanitized = sanitized.replace(/(?<!\\)"/g, '\\"');
-      // Fix the quotes we just broke at the start/end of string values
-      sanitized = sanitized.replace(/"\\"([^"]*)\\"/g, '"$1"');
+      console.log('🔧 Starting line-by-line sanitization...');
+      
+      const lines = content.split('\n');
+      const result = [];
+      let inBodyField = false;
+      let inTitleField = false;
+      let fieldContent = [];
+      let currentField = null;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Check if we're starting a body or title field
+        if (line.match(/^\s*"body"\s*:\s*"/) || line.match(/^\s*"title"\s*:\s*"/)) {
+          currentField = line.match(/^\s*"(body|title)"\s*:\s*"/)[1];
+          console.log(`🎯 Found start of "${currentField}" field at line ${i + 1}`);
+          
+          if (currentField === 'body') inBodyField = true;
+          if (currentField === 'title') inTitleField = true;
+          
+          // Check if the field ends on the same line
+          if (line.match(/",?\s*$/)) {
+            // Single-line field, extract and escape the content
+            const match = line.match(/^\s*"(body|title)"\s*:\s*"(.*)(",?\s*)$/);
+            if (match) {
+              const fieldName = match[1];
+              const value = match[2];
+              const suffix = match[3];
+              
+              console.log(`📝 Single-line "${fieldName}" value: ${value.substring(0, 100)}${value.length > 100 ? '...' : ''}`);
+              
+              const escapedValue = value
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, '\\"')
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r')
+                .replace(/\t/g, '\\t');
+              
+              const escapedLine = `  "${fieldName}": "${escapedValue}"${suffix}`;
+              result.push(escapedLine);
+              
+              console.log(`✅ Escaped single-line "${fieldName}" field`);
+              inBodyField = inTitleField = false;
+              currentField = null;
+            } else {
+              result.push(line);
+            }
+          } else {
+            // Multi-line field starts here, store the opening
+            fieldContent = [line];
+          }
+        }
+        // Check if we're ending a multi-line field  
+        else if ((inBodyField || inTitleField) && line.match(/^\s*"/)) {
+          console.log(`🏁 Found end of "${currentField}" field at line ${i + 1}`);
+          
+          // Add this line to field content
+          fieldContent.push(line);
+          
+          // Extract and rebuild the multi-line field
+          console.log(`📝 Multi-line "${currentField}" content (${fieldContent.length} lines)`);
+          
+          // Extract just the content between quotes (excluding the structural parts)
+          const firstLine = fieldContent[0];
+          const lastLine = fieldContent[fieldContent.length - 1];
+          
+          // Get content from first line after the opening quote
+          const firstMatch = firstLine.match(/^\s*"(body|title)"\s*:\s*"(.*)$/);
+          const lastMatch = lastLine.match(/^(.*)(",?\s*)$/);
+          
+          if (firstMatch && lastMatch) {
+            const fieldName = firstMatch[1];
+            let content = firstMatch[2]; // Content from first line
+            
+            // Add middle lines
+            for (let j = 1; j < fieldContent.length - 1; j++) {
+              content += '\n' + fieldContent[j];
+            }
+            
+            // Add content from last line (excluding closing quote and comma)
+            const lastContent = lastMatch[1];
+            content += '\n' + lastContent;
+            
+            // Escape the content
+            const escapedContent = content
+              .replace(/\\/g, '\\\\')
+              .replace(/"/g, '\\"')
+              .replace(/\n/g, '\\n')
+              .replace(/\r/g, '\\r')
+              .replace(/\t/g, '\\t');
+            
+            const suffix = lastMatch[2];
+            const escapedField = `  "${fieldName}": "${escapedContent}"${suffix}`;
+            result.push(escapedField);
+            
+            console.log(`✅ Escaped multi-line "${fieldName}" field`);
+          } else {
+            // Fallback: add the lines as-is if we can't parse them
+            result.push(...fieldContent);
+            console.log(`⚠️ Could not parse multi-line "${currentField}" field, added as-is`);
+          }
+          
+          // Reset state
+          inBodyField = inTitleField = false;
+          currentField = null;
+          fieldContent = [];
+        }
+        // We're in the middle of a multi-line field
+        else if (inBodyField || inTitleField) {
+          fieldContent.push(line);
+        }
+        // Regular line, not part of body or title field
+        else {
+          result.push(line);
+        }
+      }
+      
+      const sanitized = result.join('\n');
+      console.log(`🏁 Line-by-line sanitization complete. Content ${sanitized === content ? 'unchanged' : 'modified'}`);
       
       return sanitized;
+      
     } catch (error) {
       console.log(`⚠️ Failed to sanitize JSON content: ${error.message}`);
       return content;
