@@ -254,6 +254,62 @@ class RepositoryAutomation {
   }
 
   /**
+   * Sanitize JSON content to fix common issues
+   */
+  sanitizeJsonContent(content) {
+    try {
+      // Replace literal newlines with escaped newlines
+      let sanitized = content.replace(/\n/g, '\\n');
+      // Replace literal tabs with escaped tabs  
+      sanitized = sanitized.replace(/\t/g, '\\t');
+      // Replace literal carriage returns with escaped ones
+      sanitized = sanitized.replace(/\r/g, '\\r');
+      // Fix any double quotes that aren't properly escaped
+      sanitized = sanitized.replace(/(?<!\\)"/g, '\\"');
+      // Fix the quotes we just broke at the start/end of string values
+      sanitized = sanitized.replace(/"\\"([^"]*)\\"/g, '"$1"');
+      
+      return sanitized;
+    } catch (error) {
+      console.log(`⚠️ Failed to sanitize JSON content: ${error.message}`);
+      return content;
+    }
+  }
+
+  /**
+   * Validate metadata structure
+   */
+  validateMetadata(metadata) {
+    if (!metadata || typeof metadata !== 'object') {
+      return false;
+    }
+
+    // Check required fields exist
+    const requiredFields = ['type', 'event_action'];
+    for (const field of requiredFields) {
+      if (!metadata.hasOwnProperty(field)) {
+        console.log(`⚠️ Metadata missing required field: ${field}`);
+        return false;
+      }
+    }
+
+    // Validate type is one of expected values
+    if (!['pull_request', 'issue', 'workflow_run'].includes(metadata.type)) {
+      console.log(`⚠️ Invalid metadata type: ${metadata.type}`);
+      return false;
+    }
+
+    // For PR and issue types, ensure we have author info
+    if ((metadata.type === 'pull_request' || metadata.type === 'issue') && 
+        (!metadata.author || !metadata.author.login)) {
+      console.log(`⚠️ Metadata missing author information for ${metadata.type}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Load metadata from artifact (for fork compatibility)
    */
   async loadMetadataFromArtifact() {
@@ -269,11 +325,56 @@ class RepositoryAutomation {
         return null;
       }
       
-      // Read and parse metadata
+      // Read metadata content
       const metadataContent = fs.readFileSync(metadataPath, 'utf8');
-      const metadata = JSON.parse(metadataContent);
+      console.log('🔍 Raw metadata content (first 200 chars):');
+      console.log(metadataContent.substring(0, 200) + (metadataContent.length > 200 ? '...' : ''));
       
-      console.log(`📦 Loaded metadata: ${metadata.type} #${metadata.number} by ${metadata.author.login}`);
+      let metadata;
+      
+      // First attempt: try standard JSON parsing
+      try {
+        metadata = JSON.parse(metadataContent);
+        console.log('✅ Successfully parsed metadata on first attempt');
+      } catch (firstError) {
+        console.log(`⚠️ First JSON parse failed: ${firstError.message}`);
+        console.log('🔧 Attempting to sanitize and retry...');
+        
+        // Second attempt: sanitize and try again
+        const sanitizedContent = this.sanitizeJsonContent(metadataContent);
+        
+        if (sanitizedContent !== metadataContent) {
+          console.log('🔍 Sanitized metadata content (first 200 chars):');
+          console.log(sanitizedContent.substring(0, 200) + (sanitizedContent.length > 200 ? '...' : ''));
+          
+          try {
+            metadata = JSON.parse(sanitizedContent);
+            console.log('✅ Successfully parsed metadata after sanitization');
+          } catch (secondError) {
+            console.log(`❌ Second JSON parse failed: ${secondError.message}`);
+            console.log('📄 Full raw content for debugging:');
+            console.log('--- START METADATA ---');
+            console.log(metadataContent);
+            console.log('--- END METADATA ---');
+            return null;
+          }
+        } else {
+          console.log('❌ Sanitization did not change content, parsing failed');
+          console.log('📄 Full raw content for debugging:');
+          console.log('--- START METADATA ---');
+          console.log(metadataContent);
+          console.log('--- END METADATA ---');
+          return null;
+        }
+      }
+      
+      // Validate metadata structure
+      if (!this.validateMetadata(metadata)) {
+        console.log('❌ Metadata validation failed');
+        return null;
+      }
+      
+      console.log(`📦 Loaded metadata: ${metadata.type} #${metadata.number} by ${metadata.author ? metadata.author.login : 'unknown'}`);
       
       return metadata;
       
