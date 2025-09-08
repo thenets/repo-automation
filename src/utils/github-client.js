@@ -412,6 +412,60 @@ class GitHubClient {
       return [];
     }
   }
+
+  /**
+   * Get all labels available in the repository
+   */
+  async getRepositoryLabels() {
+    try {
+      const { data: labels } = await this.github.rest.issues.listLabelsForRepo({
+        owner: this.owner,
+        repo: this.repo,
+        per_page: 100
+      });
+      
+      return labels.map(label => label.name);
+      
+    } catch (error) {
+      logger.error(`❌ Error getting repository labels: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate that the specified labels exist in the repository
+   * @param {string[]} labels - Array of label names to validate
+   * @returns {Object} - Validation result with existing and missing labels
+   */
+  async validateRepositoryLabels(labels) {
+    if (!labels || labels.length === 0) {
+      return { existing: [], missing: [], valid: true };
+    }
+
+    try {
+      const repositoryLabels = await this.getRepositoryLabels();
+      const existing = [];
+      const missing = [];
+
+      labels.forEach(label => {
+        if (repositoryLabels.includes(label)) {
+          existing.push(label);
+        } else {
+          missing.push(label);
+        }
+      });
+
+      return {
+        existing,
+        missing,
+        valid: missing.length === 0
+      };
+
+    } catch (error) {
+      logger.error(`❌ Error validating repository labels: ${error.message}`);
+      throw error;
+    }
+  }
 }
 
 module.exports = { GitHubClient };

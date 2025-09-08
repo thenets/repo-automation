@@ -47,7 +47,8 @@ describe('LabelAutomation', () => {
       createComment: jest.fn(),
       cleanupWorkflowComments: jest.fn(),
       createCheckRun: jest.fn(),
-      updateCheckRun: jest.fn()
+      updateCheckRun: jest.fn(),
+      validateRepositoryLabels: jest.fn().mockResolvedValue({ existing: [], missing: [], valid: true })
     };
     GitHubClient.mockImplementation(() => mockClient);
     
@@ -429,7 +430,9 @@ describe('LabelAutomation', () => {
       // Mock the error handler
       labelAutomation.handleValidationErrors = jest.fn();
       
-      await labelAutomation.processReleaseBackportLabeling(mockPR, 'yaml-content', features);
+      // Expect the function to throw an error
+      await expect(labelAutomation.processReleaseBackportLabeling(mockPR, 'yaml-content', features))
+        .rejects.toThrow('Label validation failed: Invalid release value');
       
       expect(labelAutomation.handleValidationErrors).toHaveBeenCalledWith(
         123, 

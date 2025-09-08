@@ -191,10 +191,22 @@ class LabelAutomation {
         }
       }
 
+      // Validate repository label existence before proceeding
+      if (labelsToAdd.length > 0) {
+        const labelValidation = await this.client.validateRepositoryLabels(labelsToAdd);
+        if (!labelValidation.valid) {
+          const missingLabels = labelValidation.missing;
+          const repositoryLabelError = `❌ Repository labels do not exist: ${missingLabels.map(l => `"${l}"`).join(', ')}. ` +
+            `Repository administrators must create these labels in the repository settings before they can be used.`;
+          validationErrors.push(repositoryLabelError);
+        }
+      }
+
       // Handle validation errors by posting comments (no check runs required)
       if (validationErrors.length > 0) {
         await this.handleValidationErrors(prNumber, null, validationErrors);
-        return;
+        // Throw error to fail the job explicitly
+        throw new Error(`Label validation failed: ${validationErrors.join('; ')}`);
       }
 
       // Clean up previous error comments
@@ -384,17 +396,35 @@ class LabelAutomation {
     const acceptedReleases = this.config.getAcceptedReleases();
     const acceptedBackports = this.config.getAcceptedBackports();
 
-    const errorComment = '## 🚨 YAML Validation Error: release and backport\n\n' +
-      errors.map(error => `- ${error}`).join('\n') + '\n\n' +
-      '### How to fix:\n' +
-      '1. Update your PR description YAML block with valid values\n' +
-      '2. The workflow will automatically re-run when you edit the description\n\n' +
-      '### Valid YAML format:\n' +
-      '```yaml\n' +
-      `release: 1.5    # Valid releases: ${acceptedReleases.join(', ')}\n` +
-      `backport: 1.4   # Valid backports: ${acceptedBackports.join(', ')}\n` +
-      '```\n\n' +
-      `_This comment was posted by the repository automation workflow._`;
+    // Check if any errors are related to missing repository labels
+    const hasRepositoryLabelErrors = errors.some(error => error.includes('Repository labels do not exist'));
+
+    let errorComment = '## 🚨 YAML Validation Error: release and backport\n\n' +
+      errors.map(error => `- ${error}`).join('\n') + '\n\n';
+
+    if (hasRepositoryLabelErrors) {
+      errorComment += '### For Repository Administrators:\n' +
+        '⚠️ **Missing repository labels detected!** The following labels need to be created:\n\n' +
+        '1. Go to repository **Settings** → **Labels**\n' +
+        '2. Create the missing labels shown in the error above\n' +
+        '3. Use these naming patterns:\n' +
+        '   - `release-X.Y` (e.g., `release-2.1`, `release-2.2`)\n' +
+        '   - `backport-X.Y` (e.g., `backport-1.5`, `backport-2.0`)\n' +
+        '4. Re-run the workflow after creating the labels\n\n' +
+        '### For Contributors:\n' +
+        'Please wait for repository administrators to create the required labels.\n\n';
+    } else {
+      errorComment += '### How to fix:\n' +
+        '1. Update your PR description YAML block with valid values\n' +
+        '2. The workflow will automatically re-run when you edit the description\n\n' +
+        '### Valid YAML format:\n' +
+        '```yaml\n' +
+        `release: 1.5    # Valid releases: ${acceptedReleases.join(', ')}\n` +
+        `backport: 1.4   # Valid backports: ${acceptedBackports.join(', ')}\n` +
+        '```\n\n';
+    }
+
+    errorComment += `_This comment was posted by the repository automation workflow._`;
 
     // Only update check run if checkRunId is provided (for backwards compatibility)
     if (checkRunId) {
