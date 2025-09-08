@@ -231,7 +231,7 @@ This file contains random data, used for PR testing.
         return template_path.read_text()
 
     def generate_example_workflow(self, repo_config: RepositoryConfig) -> str:
-        """Generate a clean example workflow from comprehensive-usage.yml for the test repository.
+        """Generate a clean example workflow from templates for the test repository.
         
         Args:
             repo_config: Target repository configuration
