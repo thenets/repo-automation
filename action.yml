@@ -113,6 +113,7 @@ runs:
         echo "✅ Issue metadata collected and stored"
 
     - name: Download Artifact (if workflow_run)
+      id: download-artifact
       if: github.event_name == 'workflow_run'
       continue-on-error: true
       uses: actions/download-artifact@v5
@@ -122,8 +123,27 @@ runs:
         name: pr-metadata
         path: ./pr-metadata
 
+    - name: Check Artifact Download Permissions
+      if: github.event_name == 'workflow_run' && steps.download-artifact.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "❌ ERROR: Failed to download artifact from workflow run"
+        echo ""
+        echo "This typically means the CUSTOM_GITHUB_TOKEN lacks required permissions."
+        echo ""
+        echo "SOLUTION:"
+        echo "1. Ensure CUSTOM_GITHUB_TOKEN secret is configured in your repository"
+        echo "2. The token MUST have these permissions:"
+        echo "   - Actions: Read (CRITICAL for artifact downloads)"
+        echo "   - Issues: Write"
+        echo "   - Pull requests: Write"
+        echo "   - Metadata: Read"
+        echo ""
+        echo "See: https://github.com/thenets/repo-automation#fork-compatibility--token-setup"
+        exit 1
+
     - name: Create Fallback Metadata (if workflow_run without artifact)
-      if: github.event_name == 'workflow_run'
+      if: github.event_name == 'workflow_run' && steps.download-artifact.outcome == 'success'
       shell: bash
       run: |
         if [ ! -f ./pr-metadata/metadata.json ]; then
