@@ -196,7 +196,7 @@ release: "2.6"
       
       const parsed = JSON.parse(result);
       expect(parsed.title).toBe('   ');
-      expect(parsed.body).toBe('\\n  \\n  ');
+      expect(parsed.body).toBe('\n  \n  ');
     });
 
     test('should not modify JSON if no title or body fields present', () => {

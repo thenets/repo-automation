@@ -274,110 +274,136 @@ class RepositoryAutomation {
       // REMOVED: Global escaping that breaks JSON structure
       // We only escape content within specific string fields
       
-      console.log('🔧 Applying targeted field escaping...');
+      console.log('🔧 Using simple field-specific replacement...');
       
-      // Find and escape title field content using precise string parsing
-      const titleStart = result.indexOf('"title": "');
+      // Simple approach: Use indexOf to find the exact positions and replace content within
+      
+      // Process title field
+      const titleStartPattern = '"title": "';
+      const titleStart = result.indexOf(titleStartPattern);
       if (titleStart !== -1) {
-        console.log('🎯 Found title field, attempting precise parsing');
-        const valueStart = titleStart + 10; // Length of '"title": "'
+        const titleValueStart = titleStart + titleStartPattern.length;
         
-        // Find the end by looking for an unescaped quote followed by comma/brace
-        let pos = valueStart;
-        let escaped = false;
+        // Find the closing quote by looking for quote followed by comma/brace
         let titleEnd = -1;
-        
-        while (pos < result.length) {
-          const char = result[pos];
-          
-          if (escaped) {
-            escaped = false;
-          } else if (char === '\\') {
-            escaped = true;
-          } else if (char === '"') {
-            // Look ahead to see if this quote ends the field
-            const nextPos = pos + 1;
-            const afterQuote = result.substring(nextPos, nextPos + 10);
+        for (let i = titleValueStart; i < result.length; i++) {
+          if (result[i] === '"' && result[i-1] !== '\\') {
+            // Check if followed by comma or brace
+            const afterQuote = result.substring(i + 1, i + 5);
             if (afterQuote.match(/^\s*[,}]/)) {
-              titleEnd = pos;
-              console.log(`🎯 Found title end at position ${pos}`);
+              titleEnd = i;
               break;
             }
           }
-          pos++;
         }
         
         if (titleEnd !== -1) {
-          const titleValue = result.substring(valueStart, titleEnd);
-          console.log(`📝 Title content: "${titleValue}"`);
+          const titleValue = result.substring(titleValueStart, titleEnd);
+          console.log(`🎯 Processing title: "${titleValue}"`);
           
-          if (titleValue.includes('\n') || titleValue.includes('\t') || titleValue.includes('"') || titleValue.includes('\\')) {
-            console.log('🎯 Escaping title field content');
-            const escapedTitleValue = titleValue
-              .replace(/\\/g, '\\\\')
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, '\\n')
-              .replace(/\r/g, '\\r')
-              .replace(/\t/g, '\\t');
-            
-            result = result.substring(0, valueStart) + escapedTitleValue + result.substring(titleEnd);
-            console.log(`✅ Escaped title field content: "${escapedTitleValue}"`);
-          }
+          const escapedTitle = titleValue
+            .replace(/\\/g, '\\\\')
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t');
+          
+          result = result.substring(0, titleValueStart) + escapedTitle + result.substring(titleEnd);
+          console.log(`✅ Escaped title field`);
         }
       }
       
-      // Find body field and escape its content using improved parsing
-      const bodyStart = result.indexOf('"body": "');
+      // Process body field (after title may have changed positions)
+      const bodyStartPattern = '"body": "';
+      const bodyStart = result.indexOf(bodyStartPattern);
       if (bodyStart !== -1) {
-        console.log('🎯 Found body field, attempting precise parsing');
-        const valueStart = bodyStart + 9; // Length of '"body": "'
+        const bodyValueStart = bodyStart + bodyStartPattern.length;
         
-        // Find the end by looking for an unescaped quote followed by comma/brace
-        let pos = valueStart;
-        let escaped = false;
+        // Find the REAL end by looking for the pattern of quote followed by comma/brace
+        // Work backwards from potential end points
         let bodyEnd = -1;
         
-        while (pos < result.length) {
-          const char = result[pos];
-          
-          if (escaped) {
-            escaped = false;
-          } else if (char === '\\') {
-            escaped = true;
-          } else if (char === '"') {
-            // Look ahead to see if this quote ends the field
-            const nextPos = pos + 1;
-            const afterQuote = result.substring(nextPos, nextPos + 10);
-            if (afterQuote.match(/^\s*[,}]/)) {
-              bodyEnd = pos;
-              console.log(`🎯 Found body end at position ${pos}`);
-              break;
+        // Look for closing patterns in the JSON - comma followed by next field or closing brace
+        const possibleEndings = [];
+        
+        // Find all possible ending positions (quotes followed by comma or brace)
+        for (let i = bodyValueStart + 1; i < result.length; i++) {
+          if (result[i] === '"' && result[i-1] !== '\\') {
+            let j = i + 1;
+            // Skip whitespace
+            while (j < result.length && /\s/.test(result[j])) j++;
+            
+            if (j < result.length) {
+              if (result[j] === ',') {
+                // Check if next non-whitespace after comma looks like a JSON field
+                let k = j + 1;
+                while (k < result.length && /\s/.test(result[k])) k++;
+                if (k < result.length && result[k] === '"') {
+                  // Make sure this is actually a field name, not a string value
+                  const nextColon = result.indexOf(':', k);
+                  if (nextColon > k && nextColon < k + 50) {
+                    possibleEndings.push(i);
+                  }
+                }
+              } else if (result[j] === '}') {
+                possibleEndings.push(i);
+              }
             }
           }
-          pos++;
         }
         
-        if (bodyEnd !== -1) {
-          const bodyValue = result.substring(valueStart, bodyEnd);
-          console.log(`📝 Body content length: ${bodyValue.length} chars`);
-          console.log(`📝 First 100 chars: ${bodyValue.substring(0, 100)}...`);
+        // Choose the right ending - prefer the one that doesn't include nested objects
+        if (possibleEndings.length > 0) {
+          bodyEnd = possibleEndings[possibleEndings.length - 1]; // Start with last
           
-          if (bodyValue.includes('\n') || bodyValue.includes('\t') || bodyValue.includes('"') || bodyValue.includes('\\')) {
-            const escapedBodyValue = bodyValue
-              .replace(/\\/g, '\\\\')
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, '\\n')
-              .replace(/\r/g, '\\r')
-              .replace(/\t/g, '\\t');
-            
-            result = result.substring(0, valueStart) + escapedBodyValue + result.substring(bodyEnd);
-            console.log('✅ Escaped body field content');
-            console.log(`📝 Escaped length: ${escapedBodyValue.length} chars`);
-          } else {
-            console.log('ℹ️ Body field needs no escaping');
+          // Check if body content includes nested JSON structure (braces/brackets)
+          
+          // If the content has unbalanced braces or looks like it includes other JSON fields,
+          // try earlier endings
+          if (possibleEndings.length > 1) {
+            for (let i = possibleEndings.length - 1; i >= 0; i--) {
+              const candidateEnd = possibleEndings[i];
+              const candidateBody = result.substring(bodyValueStart, candidateEnd);
+              
+              // Check if this candidate body looks like it contains JSON structure
+              const afterCandidate = result.substring(candidateEnd);
+              
+              // If what comes after looks like a clean JSON field (starts with comma + field name),
+              // this is likely the right ending
+              if (afterCandidate.match(/^\s*,\s*"[a-zA-Z_][a-zA-Z0-9_]*"\s*:/)) {
+                bodyEnd = candidateEnd;
+                console.log(`🎯 Selected ending ${i+1}/${possibleEndings.length} based on clean JSON structure`);
+                break;
+              }
+              
+              // Also check if the candidate body doesn't contain nested objects
+              const openBraces = (candidateBody.match(/\{/g) || []).length;
+              const closeBraces = (candidateBody.match(/\}/g) || []).length;
+              if (openBraces === 0 && closeBraces === 0) {
+                // This body doesn't contain nested objects, probably safer
+                bodyEnd = candidateEnd;
+                console.log(`🎯 Selected ending ${i+1}/${possibleEndings.length} based on no nested objects`);
+                break;
+              }
+            }
           }
+          
+          const bodyValue = result.substring(bodyValueStart, bodyEnd);
+          console.log(`🎯 Processing body (${bodyValue.length} chars) - found ${possibleEndings.length} possible endings`);
+          console.log(`📝 Body preview: ${bodyValue.substring(0, 100)}...`);
+          console.log(`📝 Body ending: ...${bodyValue.substring(Math.max(0, bodyValue.length - 50))}`);
+          
+          const escapedBody = bodyValue
+            .replace(/\\/g, '\\\\')
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t');
+          
+          result = result.substring(0, bodyValueStart) + escapedBody + result.substring(bodyEnd);
+          console.log(`✅ Escaped body field (${bodyValue.length} → ${escapedBody.length} chars)`);
         } else {
-          console.log('⚠️ Could not find body field end');
+          console.log('⚠️ Could not find body field end - no valid ending patterns found');
         }
       }
       
