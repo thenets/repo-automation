@@ -254,98 +254,116 @@ class RepositoryAutomation {
   }
 
   /**
-   * Find the end position of a JSON string value, handling escaped quotes
-   */
-  findStringEnd(content, startPos) {
-    let pos = startPos;
-    let escaped = false;
-    
-    while (pos < content.length) {
-      const char = content[pos];
-      
-      if (escaped) {
-        escaped = false; // Skip this character
-      } else if (char === '\\') {
-        escaped = true; // Next character is escaped
-      } else if (char === '"') {
-        return pos; // Found the end quote
-      }
-      
-      pos++;
-    }
-    
-    return -1; // No closing quote found
-  }
-
-  /**
-   * Sanitize JSON content to fix common issues in specific fields
+   * Sanitize JSON content using simple regex replacements for common issues
    */
   sanitizeJsonContent(content) {
     try {
-      console.log('🔧 Starting position-based JSON sanitization...');
+      console.log('🔧 Starting simple regex JSON sanitization...');
       
-      let result = content;
-      const fieldsToSanitize = ['body', 'title']; // Process body first (later in content) to avoid position shifts
-      
-      for (const fieldName of fieldsToSanitize) {
-        // Find all occurrences of the field (there should typically be only one)
-        const fieldSearch = `"${fieldName}": "`;
-        let fieldPos = -1;
-        let searchStart = 0;
-        
-        // Find the last occurrence to process from right to left
-        while (true) {
-          const nextPos = result.indexOf(fieldSearch, searchStart);
-          if (nextPos === -1) break;
-          fieldPos = nextPos;
-          searchStart = nextPos + 1;
-        }
-        
-        if (fieldPos === -1) {
-          console.log(`ℹ️ Field "${fieldName}" not found`);
-          continue;
-        }
-        
-        console.log(`🎯 Found "${fieldName}" field at position ${fieldPos}`);
-        
-        // Find the start of the value (after the opening quote)
-        const valueStart = fieldPos + fieldSearch.length;
-        
-        // Find the end of the value (before the closing quote)
-        const valueEnd = this.findStringEnd(result, valueStart);
-        
-        if (valueEnd === -1) {
-          console.log(`⚠️ Could not find closing quote for "${fieldName}" field`);
-          continue;
-        }
-        
-        // Extract the raw value
-        const rawValue = result.substring(valueStart, valueEnd);
-        console.log(`📝 Raw "${fieldName}" value length: ${rawValue.length} chars`);
-        console.log(`📝 First 100 chars: ${rawValue.substring(0, 100)}${rawValue.length > 100 ? '...' : ''}`);
-        
-        // Check if the value needs escaping
-        if (rawValue.includes('\n') || rawValue.includes('\r') || rawValue.includes('\t') || rawValue.includes('"')) {
-          // Escape the value
-          const escapedValue = rawValue
-            .replace(/\\/g, '\\\\')   // Escape existing backslashes first
-            .replace(/"/g, '\\"')     // Escape quotes
-            .replace(/\n/g, '\\n')    // Escape newlines
-            .replace(/\r/g, '\\r')    // Escape carriage returns
-            .replace(/\t/g, '\\t');   // Escape tabs
-          
-          // Replace the value in the result
-          result = result.substring(0, valueStart) + escapedValue + result.substring(valueEnd);
-          
-          console.log(`✅ Escaped "${fieldName}" field`);
-          console.log(`📝 Escaped length: ${escapedValue.length} chars`);
-        } else {
-          console.log(`ℹ️ "${fieldName}" field needs no escaping`);
-        }
+      // First, try to parse as-is
+      try {
+        JSON.parse(content);
+        console.log('✅ JSON is already valid, no sanitization needed');
+        return content;
+      } catch (parseError) {
+        console.log(`📋 JSON parse failed (${parseError.message}), attempting sanitization`);
       }
       
-      console.log('🏁 Position-based sanitization complete');
-      return result;
+      let result = content;
+      
+      // Simple approach: Just replace literal newlines, tabs, and problematic quotes
+      // in the entire content, then see if it becomes valid JSON
+      
+      console.log('🔧 Applying global character escaping...');
+      
+      // Replace literal newlines with \n
+      result = result.replace(/\n/g, '\\n');
+      // Replace literal tabs with \t
+      result = result.replace(/\t/g, '\\t');
+      // Replace literal carriage returns with \r
+      result = result.replace(/\r/g, '\\r');
+      
+      console.log('📋 Applied basic escaping, testing JSON validity...');
+      
+      // Try parsing the result
+      try {
+        JSON.parse(result);
+        console.log('✅ Simple sanitization successful - JSON is now valid');
+        return result;
+      } catch (parseError) {
+        console.log(`⚠️ Simple sanitization failed: ${parseError.message}`);
+        console.log('🔧 Trying more targeted field-based approach...');
+        
+        // If simple approach failed, try more targeted field replacement
+        result = content;
+        
+        // Find title field and escape its content
+        const titleRegex = /("title"\s*:\s*")([^"]*(?:\\.[^"]*)*)"([,}])/gs;
+        result = result.replace(titleRegex, (_, prefix, value, suffix) => {
+          console.log('🎯 Found and escaping title field');
+          const escapedValue = value
+            .replace(/\\/g, '\\\\')
+            .replace(/"/g, '\\"')  
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t');
+          return prefix + escapedValue + '"' + suffix;
+        });
+        
+        // Find body field and escape its content - this is trickier for multi-line
+        const bodyStart = result.indexOf('"body": "');
+        if (bodyStart !== -1) {
+          console.log('🎯 Found body field, attempting manual parsing');
+          const valueStart = bodyStart + 9; // Length of '"body": "'
+          
+          // Find the end by looking for an unescaped quote followed by comma or }
+          let pos = valueStart;
+          let escaped = false;
+          let bodyEnd = -1;
+          
+          while (pos < result.length) {
+            const char = result[pos];
+            
+            if (escaped) {
+              escaped = false;
+            } else if (char === '\\') {
+              escaped = true;
+            } else if (char === '"') {
+              // Check if this quote ends the body field
+              const nextChars = result.substring(pos + 1, pos + 3);
+              if (nextChars.match(/^[\s]*[,}]/)) {
+                bodyEnd = pos;
+                break;
+              }
+            }
+            pos++;
+          }
+          
+          if (bodyEnd !== -1) {
+            const bodyValue = result.substring(valueStart, bodyEnd);
+            const escapedBodyValue = bodyValue
+              .replace(/\\/g, '\\\\')
+              .replace(/"/g, '\\"')
+              .replace(/\n/g, '\\n')
+              .replace(/\r/g, '\\r')
+              .replace(/\t/g, '\\t');
+            
+            result = result.substring(0, valueStart) + escapedBodyValue + result.substring(bodyEnd);
+            console.log('✅ Escaped body field manually');
+          }
+        }
+        
+        // Final attempt to parse
+        try {
+          JSON.parse(result);
+          console.log('✅ Targeted sanitization successful - JSON is now valid');
+          return result;
+        } catch (finalError) {
+          console.log(`⚠️ All sanitization attempts failed: ${finalError.message}`);
+          console.log('📄 Falling back to original content');
+          return content;
+        }
+      }
       
     } catch (error) {
       console.log(`⚠️ Failed to sanitize JSON content: ${error.message}`);
