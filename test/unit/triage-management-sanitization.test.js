@@ -226,5 +226,78 @@ And more \\"nested \\\\\\"quotes\\\\\\" here\""
       expect(parsed.title).toContain('C:\\\\Users\\\\test');
       expect(parsed.body).toContain('const x = \'hello\';');
     });
+
+    test('should handle GitHub Actions artifact metadata with YAML content causing "Bad control character" error', () => {
+      // This test reproduces the exact error from GitHub Actions job:
+      // "⚠️ Failed to load artifact metadata: Bad control character in string literal in JSON at position 116"
+      const input = '{\n' +
+        '  "type": "pull_request",\n' +
+        '  "event_action": "edited",\n' +
+        '  "number": 6,\n' +
+        '  "title": "no op change",\n' +
+        '  "body": "```yaml\n' +
+        'release: 2.1\n' +
+        'backport: # (optional) \\"2.5\\", \\"2.6\\", \\"2.7\\"\n' +
+        'needs_feature_branch: true\n' +
+        '```\n' +
+        '\n' +
+        '## Description\n' +
+        'Some description here",\n' +
+        '  "state": "open",\n' +
+        '  "draft": false\n' +
+        '}';
+
+      // This should fail with "Bad control character in string literal in JSON" 
+      expect(() => JSON.parse(input)).toThrow(/Bad control character/);
+
+      // After sanitization, it should parse successfully
+      const result = automation.sanitizeJsonContent(input);
+      expect(() => JSON.parse(result)).not.toThrow();
+
+      const parsed = JSON.parse(result);
+      expect(parsed.title).toBe('no op change');
+      expect(parsed.body).toContain('```yaml');
+      expect(parsed.body).toContain('release: 2.1');
+      expect(parsed.body).toContain('needs_feature_branch: true');
+      expect(parsed.body).toContain('## Description');
+    });
+
+    test('should handle artifact metadata with complex YAML blocks and quotes', () => {
+      // Test with the more complex scenario that includes both YAML and nested quotes
+      const input = '{\n' +
+        '  "type": "pull_request",\n' +
+        '  "number": 6,\n' +
+        '  "title": "Update with \\"quoted\\" content",\n' +
+        '  "body": "## Description\n' +
+        '\n' +
+        '```yaml\n' +
+        'release: 2.1\n' +
+        'backport: # (optional) \\"2.5\\", \\"2.6\\", \\"2.7\\"\n' +
+        'needs_feature_branch: true\n' +
+        'labels:\n' +
+        '  - \\"enhancement\\"\n' +  
+        '  - \\"bug-fix\\"\n' +
+        '```\n' +
+        '\n' +
+        'More content with \\"quotes\\" and\n' +
+        'multi-line text.",\n' +
+        '  "author": {\n' +
+        '    "login": "testuser"\n' +
+        '  }\n' +
+        '}';
+
+      // Should fail without sanitization
+      expect(() => JSON.parse(input)).toThrow();
+
+      // Should work after sanitization
+      const result = automation.sanitizeJsonContent(input);
+      expect(() => JSON.parse(result)).not.toThrow();
+
+      const parsed = JSON.parse(result);
+      expect(parsed.body).toContain('```yaml');
+      expect(parsed.body).toContain('release: 2.1');
+      expect(parsed.body).toContain('\\"enhancement\\"');
+      expect(parsed.title).toContain('\\"quoted\\"');
+    });
   });
 });

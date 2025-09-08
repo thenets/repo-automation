@@ -4,6 +4,8 @@
  * Supports all repository automation features
  */
 
+const { logger } = require('./logger');
+
 class ConfigManager {
   constructor(context, options = {}) {
     this.context = context;
@@ -137,24 +139,26 @@ class ConfigManager {
    * Log configuration information
    */
   logConfig() {
-    console.log(`📋 Configuration:`);
-    console.log(`  - Repository: ${this.repository}`);
-    console.log(`  - Dry Run: ${this.isDryRun()}`);
-    console.log(`  - Token: ${this.getGithubToken() ? '[CONFIGURED]' : '[NOT SET]'}`);
+    logger.log(`📋 Configuration:`);
+    logger.indent();
+    logger.log(`Repository: ${this.repository}`);
+    logger.log(`Dry Run: ${this.isDryRun()}`);
+    logger.log(`Token: ${this.getGithubToken() ? '[CONFIGURED]' : '[NOT SET]'}`);
     
     // Log feature configurations
     if (this.isReleaseLabelingEnabled()) {
-      console.log(`  - Release Labels: ${this.getAcceptedReleases().join(', ')}`);
+      logger.log(`Release Labels: ${this.getAcceptedReleases().join(', ')}`);
     }
     if (this.isBackportLabelingEnabled()) {
-      console.log(`  - Backport Labels: ${this.getAcceptedBackports().join(', ')}`);
+      logger.log(`Backport Labels: ${this.getAcceptedBackports().join(', ')}`);
     }
     if (this.isFeatureBranchEnabled()) {
-      console.log(`  - Feature Branch: enabled`);
+      logger.log(`Feature Branch: enabled`);
     }
     if (this.isStaleDetectionEnabled()) {
-      console.log(`  - Stale Detection: ${this.getStaleDays()} day(s)`);
+      logger.log(`Stale Detection: ${this.getStaleDays()} day(s)`);
     }
+    logger.outdent();
   }
 
   /**

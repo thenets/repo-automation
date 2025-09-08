@@ -11,6 +11,7 @@
 
 const { ConfigManager } = require('./utils/config');
 const { GitHubClient } = require('./utils/github-client');
+const { logger } = require('./utils/logger');
 
 class StaleDetection {
   constructor(context, github, options = {}) {
@@ -35,28 +36,31 @@ class StaleDetection {
    */
   async execute() {
     try {
-      console.log(`⏰ Starting stale detection (threshold: ${this.staleDays} day(s))`);
+      logger.log(`⏰ Starting stale detection (threshold: ${this.staleDays} day(s))`);
+      logger.indent();
       
       const now = new Date();
       const pullRequests = await this.client.listOpenPRs();
       
-      console.log(`Found ${pullRequests.length} open pull requests`);
+      logger.log(`📁 Found ${pullRequests.length} open pull requests`);
       this.result.processedPRs = pullRequests.length;
 
       for (const pr of pullRequests) {
         try {
           await this.processPR(pr, now);
         } catch (error) {
-          console.error(`Error processing PR #${pr.number}:`, error.message);
+          logger.error(`❌ Error processing PR #${pr.number}: ${error.message}`);
           // Continue processing other PRs even if one fails
         }
       }
 
-      console.log(`✅ Stale detection completed: ${this.result.stalePRsFound} PRs marked as stale`);
+      logger.log(`✅ Stale detection completed: ${this.result.stalePRsFound} PRs marked as stale`);
+      logger.outdent();
       return this.result;
 
     } catch (error) {
-      console.error('❌ Stale detection failed:', error.message);
+      logger.outdent();
+      logger.error('❌ Stale detection failed: ' + error.message);
       throw error;
     }
   }
@@ -69,14 +73,14 @@ class StaleDetection {
     
     // Skip if PR is a draft
     if (pr.draft) {
-      console.log(`PR #${prNumber} is a draft, skipping`);
+      logger.log(`PR #${prNumber} is a draft, skipping`);
       return;
     }
 
     // Skip if PR already has stale label
     const hasStaleLabel = pr.labels.some(label => label.name === 'stale');
     if (hasStaleLabel) {
-      console.log(`PR #${prNumber} already has stale label, skipping`);
+      logger.log(`PR #${prNumber} already has stale label, skipping`);
       return;
     }
 
@@ -85,7 +89,7 @@ class StaleDetection {
     const timeSinceLastActivity = now - lastActivity;
     const hoursSinceActivity = Math.floor(timeSinceLastActivity / (1000 * 60 * 60));
 
-    console.log(`PR #${prNumber}: Last activity ${hoursSinceActivity} hours ago`);
+    logger.log(`PR #${prNumber}: Last activity ${hoursSinceActivity} hours ago`);
 
     // If no activity for more than threshold, add stale label
     if (timeSinceLastActivity > this.staleThresholdMs) {
@@ -104,11 +108,11 @@ class StaleDetection {
         this.result.labelsAdded.push(...result.added);
         this.result.actions.push(`Added stale label to PR #${prNumber} (inactive for ${hoursSinceActivity} hours)`);
         this.result.stalePRsFound++;
-        console.log(`✅ Added stale label to PR #${prNumber} (inactive for ${hoursSinceActivity} hours)`);
+        logger.log(`✅ Added stale label to PR #${prNumber} (inactive for ${hoursSinceActivity} hours)`);
       }
       
     } catch (error) {
-      console.error(`❌ Failed to add stale label to PR #${prNumber}:`, error.message);
+      logger.error(`❌ Failed to add stale label to PR #${prNumber}: ${error.message}`);
       throw error;
     }
   }

@@ -4,6 +4,8 @@
  * Supports all repository automation features
  */
 
+const { logger } = require('./logger');
+
 class GitHubClient {
   constructor(github, config) {
     this.github = github;
@@ -17,7 +19,7 @@ class GitHubClient {
    */
   async addLabels(issueNumber, labels) {
     if (this.config.isDryRun()) {
-      console.log(`🧪 DRY RUN: Would add labels [${labels.join(', ')}] to #${issueNumber}`);
+      logger.log(`🧪 DRY RUN: Would add labels [${labels.join(', ')}] to #${issueNumber}`);
       return { added: labels, skipped: false };
     }
 
@@ -29,7 +31,7 @@ class GitHubClient {
         labels: labels
       });
       
-      console.log(`✅ Successfully added labels [${labels.join(', ')}] to #${issueNumber}`);
+      logger.log(`✅ Successfully added labels [${labels.join(', ')}] to #${issueNumber}`);
       return { added: labels, skipped: false };
       
     } catch (error) {
@@ -51,7 +53,7 @@ class GitHubClient {
       return labels.map(label => label.name);
       
     } catch (error) {
-      console.error(`❌ Error getting labels for #${issueNumber}:`, error.message);
+      logger.error(`❌ Error getting labels for #${issueNumber}: ${error.message}`);
       throw error;
     }
   }
@@ -91,7 +93,7 @@ class GitHubClient {
       return pr;
       
     } catch (error) {
-      console.error(`❌ Error getting PR #${prNumber}:`, error.message);
+      logger.error(`❌ Error getting PR #${prNumber}: ${error.message}`);
       throw error;
     }
   }
@@ -113,7 +115,7 @@ class GitHubClient {
       return prs.length > 0 ? prs[0] : null;
       
     } catch (error) {
-      console.error(`❌ Error finding PR for branch ${branchName}:`, error.message);
+      logger.error(`❌ Error finding PR for branch ${branchName}: ${error.message}`);
       throw error;
     }
   }
@@ -124,7 +126,7 @@ class GitHubClient {
   _handleLabelError(error, issueNumber, labels, action) {
     if (error.status === 403) {
       const errorMsg = `❌ Permission denied: Unable to ${action} labels [${labels.join(', ')}] to #${issueNumber}. Repository administrators should add a CUSTOM_GITHUB_TOKEN secret with appropriate permissions.`;
-      console.error(errorMsg);
+      logger.error(errorMsg);
       throw new Error(errorMsg);
       
     } else if (error.status === 422) {
@@ -133,7 +135,7 @@ class GitHubClient {
       
     } else {
       const errorMsg = `❌ Unexpected error ${action}ing labels [${labels.join(', ')}] to #${issueNumber}: ${error.message}`;
-      console.error(errorMsg);
+      logger.error(errorMsg);
       throw new Error(errorMsg);
     }
   }
@@ -147,17 +149,17 @@ class GitHubClient {
       const alreadyHasLabels = labels.filter(label => currentLabels.includes(label));
       
       if (alreadyHasLabels.length > 0) {
-        console.log(`ℹ️ Labels [${alreadyHasLabels.join(', ')}] already exist on #${issueNumber} - this is expected behavior`);
+        logger.info(`ℹ️ Labels [${alreadyHasLabels.join(', ')}] already exist on #${issueNumber} - this is expected behavior`);
         return { added: [], skipped: alreadyHasLabels };
       } else {
         const errorMsg = `❌ Failed to ${action} labels [${labels.join(', ')}] to #${issueNumber}: One or more labels don't exist in the repository.`;
-        console.error(errorMsg);
+        logger.error(errorMsg);
         throw new Error(errorMsg);
       }
       
     } catch (listError) {
       const errorMsg = `❌ Error checking existing labels on #${issueNumber}: ${listError.message}`;
-      console.error(errorMsg);
+      logger.error(errorMsg);
       throw new Error(errorMsg);
     }
   }
@@ -167,7 +169,7 @@ class GitHubClient {
    */
   async createCheckRun(name, headSha, detailsUrl) {
     if (this.config.isDryRun()) {
-      console.log(`🧪 DRY RUN: Would create check run "${name}" for ${headSha}`);
+      logger.log(`🧪 DRY RUN: Would create check run "${name}" for ${headSha}`);
       return { data: { id: 'dry-run-check-id' } };
     }
 
@@ -182,11 +184,11 @@ class GitHubClient {
         details_url: detailsUrl
       });
 
-      console.log(`📋 Created check run ${checkRun.data.id} for commit ${headSha}`);
+      logger.log(`📋 Created check run ${checkRun.data.id} for commit ${headSha}`);
       return checkRun;
 
     } catch (error) {
-      console.error(`❌ Error creating check run:`, error.message);
+      logger.error(`❌ Error creating check run: ${error.message}`);
       throw error;
     }
   }
@@ -196,7 +198,7 @@ class GitHubClient {
    */
   async updateCheckRun(checkRunId, status, conclusion, output) {
     if (this.config.isDryRun()) {
-      console.log(`🧪 DRY RUN: Would update check run ${checkRunId} with ${conclusion}`);
+      logger.log(`🧪 DRY RUN: Would update check run ${checkRunId} with ${conclusion}`);
       return;
     }
 
@@ -211,7 +213,7 @@ class GitHubClient {
         output: output
       });
 
-      console.log(`📋 Updated check run ${checkRunId} with ${conclusion}`);
+      logger.log(`📋 Updated check run ${checkRunId} with ${conclusion}`);
 
     } catch (error) {
       console.error(`❌ Error updating check run:`, error.message);

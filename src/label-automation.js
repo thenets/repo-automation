@@ -13,6 +13,7 @@
 
 const { ConfigManager } = require('./utils/config');
 const { GitHubClient } = require('./utils/github-client');
+const { logger } = require('./utils/logger');
 
 class LabelAutomation {
   constructor(context, github, options = {}) {
@@ -32,20 +33,20 @@ class LabelAutomation {
    */
   async execute(features) {
     try {
-      console.log(`🔖 Starting label automation...`);
+      logger.log(`🔖 Starting label automation...`);
 
       // Extract PR data from event
       const targetPrData = await this.extractPRData();
       if (!targetPrData) {
-        console.log('ℹ️ No PR data available for label automation');
+        logger.info('ℹ️ No PR data available for label automation');
         return this.result;
       }
 
-      console.log(`🔍 Processing PR #${targetPrData.number}: ${targetPrData.title}`);
+      logger.log(`🔍 Processing PR #${targetPrData.number}: ${targetPrData.title}`);
 
       // Skip if PR is draft
       if (targetPrData.draft) {
-        console.log('⏭️ Skipping draft pull request');
+        logger.info('⏭️ Skipping draft pull request');
         return this.result;
       }
 
@@ -53,23 +54,23 @@ class LabelAutomation {
       const yamlContent = this.config.parseYamlFromText(targetPrData.body || '');
       
       if (!yamlContent) {
-        console.log('ℹ️ No YAML frontmatter found in PR description');
+        logger.info('ℹ️ No YAML frontmatter found in PR description');
         
         // Clean up any existing error comments when YAML is completely removed
         if (features.featureBranch) {
-          console.log('🧹 Cleaning up feature branch error comments (no YAML found)');
+          logger.info('🧹 Cleaning up feature branch error comments (no YAML found)');
           await this.client.cleanupWorkflowComments(targetPrData.number, '🚨 YAML Validation Error: feature branch');
         }
         
         if (features.releaseLabeling || features.backportLabeling) {
-          console.log('🧹 Cleaning up release/backport error comments (no YAML found)');
+          logger.info('🧹 Cleaning up release/backport error comments (no YAML found)');
           await this.client.cleanupWorkflowComments(targetPrData.number, '🚨 YAML Validation Error: release and backport');
         }
         
         return this.result;
       }
 
-      console.log(`📝 Found YAML content in PR description`);
+      logger.log(`📝 Found YAML content in PR description`);
 
       // Process release/backport labeling if enabled
       if (features.releaseLabeling || features.backportLabeling) {
@@ -84,7 +85,7 @@ class LabelAutomation {
       return this.result;
 
     } catch (error) {
-      console.error('❌ Label automation failed:', error.message);
+      logger.error('❌ Label automation failed:' + error.message);
       throw error;
     }
   }
@@ -101,12 +102,12 @@ class LabelAutomation {
       const metadata = await this.loadMetadataFromArtifact();
       
       if (metadata && metadata.type === 'pull_request') {
-        console.log(`📦 Using metadata from artifact: ${metadata.type} #${metadata.number}`);
+        logger.log(`📦 Using metadata from artifact: ${metadata.type} #${metadata.number}`);
         return metadata;
       }
       
       // Fallback to old pattern: find PR by branch
-      console.log('⚠️ No artifact metadata found, falling back to branch-based PR lookup');
+      logger.info('⚠️ No artifact metadata found, falling back to branch-based PR lookup');
       const workflowRun = this.context.payload.workflow_run;
       const headBranch = workflowRun.head_branch;
       
@@ -137,7 +138,7 @@ class LabelAutomation {
       const metadataPath = path.join('./pr-metadata', 'metadata.json');
       
       if (!fs.existsSync(metadataPath)) {
-        console.log('📋 No artifact metadata file found');
+        logger.info('📋 No artifact metadata file found');
         return null;
       }
       
@@ -145,12 +146,12 @@ class LabelAutomation {
       const metadataContent = fs.readFileSync(metadataPath, 'utf8');
       const metadata = JSON.parse(metadataContent);
       
-      console.log(`📦 Loaded metadata: ${metadata.type} #${metadata.number} by ${metadata.author.login}`);
+      logger.log(`📦 Loaded metadata: ${metadata.type} #${metadata.number} by ${metadata.author.login}`);
       
       return metadata;
       
     } catch (error) {
-      console.log(`⚠️ Failed to load artifact metadata: ${error.message}`);
+      logger.log(`⚠️ Failed to load artifact metadata: ${error.message}`);
       return null;
     }
   }
@@ -205,9 +206,9 @@ class LabelAutomation {
         this.result.labelsAdded.push(...result.added);
         this.result.actions.push(`Added release/backport labels: ${labelsToAdd.join(', ')}`);
 
-        console.log(`✅ Successfully added release/backport labels: ${labelsToAdd.join(', ')}`);
+        logger.log(`✅ Successfully added release/backport labels: ${labelsToAdd.join(', ')}`);
       } else {
-        console.log('ℹ️ No release/backport labels to add based on YAML configuration');
+        logger.info('ℹ️ No release/backport labels to add based on YAML configuration');
       }
 
     } catch (error) {

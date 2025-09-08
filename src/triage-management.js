@@ -16,6 +16,7 @@
 
 const { ConfigManager } = require('./utils/config');
 const { GitHubClient } = require('./utils/github-client');
+const { logger } = require('./utils/logger');
 
 class RepositoryAutomation {
   constructor(context, github, options = {}) {
@@ -50,7 +51,7 @@ class RepositoryAutomation {
     
     // Log enabled features
     const enabledFeatures = Object.keys(features).filter(f => features[f]);
-    console.log(`🎯 Enabled features: ${enabledFeatures.join(', ')}`);
+    logger.log(`🎯 Enabled features: ${enabledFeatures.join(', ')}`);
     
     return features;
   }
@@ -63,7 +64,7 @@ class RepositoryAutomation {
       this.config.validate();
       this.config.logConfig();
 
-      console.log(`🔄 Starting repository automation for event: ${this.context.eventName}`);
+      logger.log(`🔄 Starting repository automation for event: ${this.context.eventName}`);
       
       // Store enabled features in result
       this.result.featuresEnabled = Object.keys(this.features).filter(f => this.features[f]);
@@ -83,7 +84,7 @@ class RepositoryAutomation {
       return this.result;
 
     } catch (error) {
-      console.error('❌ Repository automation failed:', error.message);
+      logger.error('❌ Repository automation failed:' + error.message);
       this.result.summary = `Failed: ${error.message}`;
       throw error;
     }
@@ -93,79 +94,79 @@ class RepositoryAutomation {
    * Execute core triage automation (always runs)
    */
   async executeTriageAutomation() {
-    console.log('🏷️ Executing core triage automation...');
-    
-    // Handle different event types for triage
-    if (this.context.eventName === 'issues') {
-      await this.handleIssueEvent();
-    } else if (this.context.eventName === 'workflow_run') {
-      await this.handleWorkflowRunEvent();
-    } else if (this.context.eventName === 'pull_request') {
-      // Direct PR events (when not using workflow_run pattern)
-      const prData = this.context.payload.pull_request;
-      await this.handlePullRequestEvent(prData);
-    } else {
-      console.log(`ℹ️ Event type ${this.context.eventName} not handled by triage automation`);
-    }
+    await logger.group('🏷️ Executing core triage automation...', async () => {
+      // Handle different event types for triage
+      if (this.context.eventName === 'issues') {
+        await this.handleIssueEvent();
+      } else if (this.context.eventName === 'workflow_run') {
+        await this.handleWorkflowRunEvent();
+      } else if (this.context.eventName === 'pull_request') {
+        // Direct PR events (when not using workflow_run pattern)
+        const prData = this.context.payload.pull_request;
+        await this.handlePullRequestEvent(prData);
+      } else {
+        logger.info(`ℹ️ Event type ${this.context.eventName} not handled by triage automation`);
+      }
+    });
   }
 
   /**
    * Execute label automation features (release/backport/feature-branch)
    */
   async executeLabelAutomation() {
-    console.log('🔖 Executing label automation...');
-    
-    try {
-      // Only process pull_request or workflow_run events for label automation
-      if (this.context.eventName === 'pull_request' || this.context.eventName === 'workflow_run') {
-        // We don't need to extract PR data here since LabelAutomation 
-        // can now handle it on its own with the updated extractPRData method
-        
-        // Import label automation module when needed
-        const { LabelAutomation } = require('./label-automation');
-        const labelAutomation = new LabelAutomation(this.context, this.github, this.config.options);
-        
-        const labelResult = await labelAutomation.execute(this.features);
-        
-        // Merge results
-        this.result.labelsAdded.push(...(labelResult.labelsAdded || []));
-        this.result.actions.push(...(labelResult.actions || []));
+    await logger.group('🔖 Executing label automation...', async () => {
+      try {
+        // Only process pull_request or workflow_run events for label automation
+        if (this.context.eventName === 'pull_request' || this.context.eventName === 'workflow_run') {
+          // We don't need to extract PR data here since LabelAutomation 
+          // can now handle it on its own with the updated extractPRData method
+          
+          // Import label automation module when needed
+          const { LabelAutomation } = require('./label-automation');
+          const labelAutomation = new LabelAutomation(this.context, this.github, this.config.options);
+          
+          const labelResult = await labelAutomation.execute(this.features);
+          
+          // Merge results
+          this.result.labelsAdded.push(...(labelResult.labelsAdded || []));
+          this.result.actions.push(...(labelResult.actions || []));
+        }
+      } catch (error) {
+        if (error.code === 'MODULE_NOT_FOUND') {
+          logger.info('ℹ️ Label automation module not yet implemented, skipping...');
+        } else {
+          throw error;
+        }
       }
-    } catch (error) {
-      if (error.code === 'MODULE_NOT_FOUND') {
-        console.log('ℹ️ Label automation module not yet implemented, skipping...');
-      } else {
-        throw error;
-      }
-    }
+    });
   }
 
   /**
    * Execute stale detection feature
    */
   async executeStaleDetection() {
-    console.log('⏰ Executing stale detection...');
-    
-    try {
-      // Only run stale detection on schedule events or when explicitly requested
-      if (this.context.eventName === 'schedule' || this.features.staleDetection) {
-        // Import stale detection module when needed
-        const { StaleDetection } = require('./stale-detection');
-        const staleDetection = new StaleDetection(this.context, this.github, this.config.options);
-        
-        const staleResult = await staleDetection.execute();
-        
-        // Merge results
-        this.result.labelsAdded.push(...(staleResult.labelsAdded || []));
-        this.result.actions.push(...(staleResult.actions || []));
+    await logger.group('⏰ Executing stale detection...', async () => {
+      try {
+        // Only run stale detection on schedule events or when explicitly requested
+        if (this.context.eventName === 'schedule' || this.features.staleDetection) {
+          // Import stale detection module when needed
+          const { StaleDetection } = require('./stale-detection');
+          const staleDetection = new StaleDetection(this.context, this.github, this.config.options);
+          
+          const staleResult = await staleDetection.execute();
+          
+          // Merge results
+          this.result.labelsAdded.push(...(staleResult.labelsAdded || []));
+          this.result.actions.push(...(staleResult.actions || []));
+        }
+      } catch (error) {
+        if (error.code === 'MODULE_NOT_FOUND') {
+          logger.info('ℹ️ Stale detection module not yet implemented, skipping...');
+        } else {
+          throw error;
+        }
       }
-    } catch (error) {
-      if (error.code === 'MODULE_NOT_FOUND') {
-        console.log('ℹ️ Stale detection module not yet implemented, skipping...');
-      } else {
-        throw error;
-      }
-    }
+    });
   }
 
   /**
@@ -173,12 +174,12 @@ class RepositoryAutomation {
    */
   async handleIssueEvent() {
     if (this.context.payload.action !== 'opened') {
-      console.log(`ℹ️ Issue action ${this.context.payload.action} not handled`);
+      logger.info(`ℹ️ Issue action ${this.context.payload.action} not handled`);
       return;
     }
 
     const issueNumber = this.context.issue.number;
-    console.log(`🎯 Processing new issue #${issueNumber}`);
+    logger.log(`🎯 Processing new issue #${issueNumber}`);
 
     try {
       const result = await this.client.addLabels(issueNumber, ['triage']);
@@ -207,13 +208,13 @@ class RepositoryAutomation {
       return;
     }
 
-    console.log(`🔄 Processing workflow_run from: ${workflowRun.name}`);
+    logger.log(`🔄 Processing workflow_run from: ${workflowRun.name}`);
     
     // Try to load metadata from artifact first (new fork-compatible pattern)
     const metadata = await this.loadMetadataFromArtifact();
     
     if (metadata) {
-      console.log(`📦 Using metadata from artifact: ${metadata.type} #${metadata.number}`);
+      logger.log(`📦 Using metadata from artifact: ${metadata.type} #${metadata.number}`);
       
       if (metadata.type === 'pull_request') {
         await this.handlePullRequestEvent(metadata);
@@ -224,7 +225,7 @@ class RepositoryAutomation {
     }
     
     // Fallback to old pattern: find PR by branch
-    console.log('⚠️ No artifact metadata found, falling back to branch-based PR lookup');
+    logger.log('⚠️ No artifact metadata found, falling back to branch-based PR lookup');
     
     const headBranch = workflowRun.head_branch;
     console.log(`📋 Head branch: ${headBranch}`);
