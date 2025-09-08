@@ -520,6 +520,49 @@ class RepositoryAutomation {
         }
       }
       
+      // Decode base64 encoded fields if present
+      if (metadata.encoding) {
+        if (metadata.encoding.title === 'base64' && metadata.title_base64 !== undefined) {
+          try {
+            // Handle empty strings
+            if (metadata.title_base64 === '') {
+              metadata.title = '';
+              console.log('✅ Decoded empty base64 title field');
+            } else {
+              // Validate base64 format before decoding
+              if (!/^[A-Za-z0-9+/]*={0,2}$/.test(metadata.title_base64)) {
+                console.log(`⚠️ Invalid base64 format in title field`);
+              } else {
+                metadata.title = Buffer.from(metadata.title_base64, 'base64').toString('utf8');
+                console.log('✅ Decoded base64 title field');
+              }
+            }
+          } catch (error) {
+            console.log(`⚠️ Failed to decode base64 title: ${error.message}`);
+          }
+        }
+        
+        if (metadata.encoding.body === 'base64' && metadata.body_base64 !== undefined) {
+          try {
+            // Handle empty strings
+            if (metadata.body_base64 === '') {
+              metadata.body = '';
+              console.log('✅ Decoded empty base64 body field');
+            } else {
+              // Validate base64 format before decoding
+              if (!/^[A-Za-z0-9+/]*={0,2}$/.test(metadata.body_base64)) {
+                console.log(`⚠️ Invalid base64 format in body field`);
+              } else {
+                metadata.body = Buffer.from(metadata.body_base64, 'base64').toString('utf8');
+                console.log('✅ Decoded base64 body field');
+              }
+            }
+          } catch (error) {
+            console.log(`⚠️ Failed to decode base64 body: ${error.message}`);
+          }
+        }
+      }
+      
       // Validate metadata structure
       if (!this.validateMetadata(metadata)) {
         console.log('❌ Metadata validation failed');

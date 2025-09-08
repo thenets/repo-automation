@@ -50,15 +50,23 @@ runs:
       run: |
         echo "📋 Collecting PR metadata for direct event"
         mkdir -p ./pr-metadata
-        cat > ./pr-metadata/metadata.json << 'EOF'
+        # Create base64 encoded metadata to prevent JSON parsing issues with special characters
+        TITLE_B64=$(echo -n '${{ github.event.pull_request.title }}' | base64 -w 0)
+        BODY_B64=$(echo -n '${{ github.event.pull_request.body }}' | base64 -w 0)
+        
+        cat > ./pr-metadata/metadata.json << EOF
         {
           "type": "pull_request",
           "event_action": "${{ github.event.action }}",
           "number": ${{ github.event.number }},
-          "title": ${{ toJSON(github.event.pull_request.title) }},
-          "body": ${{ toJSON(github.event.pull_request.body) }},
+          "title_base64": "$TITLE_B64",
+          "body_base64": "$BODY_B64",
           "state": "${{ github.event.pull_request.state }}",
           "draft": ${{ github.event.pull_request.draft }},
+          "encoding": {
+            "title": "base64",
+            "body": "base64"
+          },
           "head": {
             "ref": "${{ github.event.pull_request.head.ref }}",
             "sha": "${{ github.event.pull_request.head.sha }}",
@@ -94,14 +102,22 @@ runs:
       run: |
         echo "📋 Collecting issue metadata for direct event"
         mkdir -p ./pr-metadata
-        cat > ./pr-metadata/metadata.json << 'EOF'
+        # Create base64 encoded metadata to prevent JSON parsing issues with special characters
+        TITLE_B64=$(echo -n '${{ github.event.issue.title }}' | base64 -w 0)
+        BODY_B64=$(echo -n '${{ github.event.issue.body }}' | base64 -w 0)
+        
+        cat > ./pr-metadata/metadata.json << EOF
         {
           "type": "issue",
           "event_action": "${{ github.event.action }}",
           "number": ${{ github.event.number }},
-          "title": ${{ toJSON(github.event.issue.title) }},
-          "body": ${{ toJSON(github.event.issue.body) }},
+          "title_base64": "$TITLE_B64",
+          "body_base64": "$BODY_B64",
           "state": "${{ github.event.issue.state }}",
+          "encoding": {
+            "title": "base64",
+            "body": "base64"
+          },
           "author": {
             "login": "${{ github.event.issue.user.login }}",
             "id": ${{ github.event.issue.user.id }}
