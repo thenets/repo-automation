@@ -31,8 +31,8 @@ jobs:
             "type": "pull_request",
             "event_action": "${{ github.event.action }}",
             "number": ${{ github.event.pull_request.number }},
-            "title": "${{ github.event.pull_request.title }}",
-            "body": "${{ github.event.pull_request.body }}",
+            "title": ${{ toJSON(github.event.pull_request.title) }},
+            "body": ${{ toJSON(github.event.pull_request.body) }},
             "state": "${{ github.event.pull_request.state }}",
             "head": {
               "ref": "${{ github.event.pull_request.head.ref }}",
@@ -54,8 +54,8 @@ jobs:
             "type": "issue",
             "event_action": "${{ github.event.action }}",
             "number": ${{ github.event.issue.number }},
-            "title": "${{ github.event.issue.title }}",
-            "body": "${{ github.event.issue.body }}",
+            "title": ${{ toJSON(github.event.issue.title) }},
+            "body": ${{ toJSON(github.event.issue.body) }},
             "state": "${{ github.event.issue.state }}",
             "author": {
               "login": "${{ github.event.issue.user.login }}",
