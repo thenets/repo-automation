@@ -2,13 +2,21 @@
 
 **Complete Repository Automation** is now available as a unified GitHub Action! This project has migrated from individual keeper workflows to a single, powerful action that reduces configuration from ~1,500 lines to just ~20 lines.
 
-## 🔐 Fork Compatibility & Token Setup
+## 🚀 GitHub Action (Action Mode Only)
 
-### Fork Compatibility Architecture
+This repository now **only supports the Action mode**. All individual keeper workflows have been removed and consolidated into a single, feature-rich GitHub Action.
+
+### Quick Start
+
+#### 🔐 Fork Compatibility & Token Setup
+
+**⚠️ IMPORTANT**: Before using these workflows, you must set up a custom GitHub token for fork compatibility and cross-workflow artifact access.
+
+##### Fork Compatibility Architecture
 
 This repository implements a **fork-compatible architecture** that allows external contributors to trigger labeling workflows seamlessly. The system uses a two-workflow pattern to separate data collection from privileged operations.
 
-#### Problem Statement
+##### Problem Statement
 
 Traditional GitHub Actions workflows fail when triggered by pull requests from forks because:
 - Forked repositories don't have access to the original repository's secrets
@@ -16,15 +24,17 @@ Traditional GitHub Actions workflows fail when triggered by pull requests from f
 - Workflows cannot add labels to pull requests from forks without elevated permissions
 - **Cross-workflow artifact access** requires elevated permissions (artifacts created by trigger workflows cannot be downloaded by main workflows using standard `GITHUB_TOKEN`)
 
-#### Solution: Custom GitHub Token
+##### Solution: Custom GitHub Token
 
 To enable all workflows to function properly for external contributors AND cross-workflow artifact access, repository administrators **must** create a fine-grained personal access token with the following permissions:
 
 **Required Permissions:**
-- **Actions: Read** - **CRITICAL** for downloading artifacts from trigger workflows
-- **Issues: Write** - Required to add labels to issues
-- **Pull requests: Write** - Required to add labels to pull requests  
 - **Metadata: Read** - Required to access repository information
+- **Actions: Read and Write** - Required for downloading artifacts from trigger workflows and managing workflow runs
+- **Code: Read and Write** - Required to access repository code and make changes
+- **Issues: Read and Write** - Required to read and add labels to issues
+- **Pull requests: Read and Write** - Required to read and add labels to pull requests
+- **Workflows: Read and Write** - Required to manage and trigger workflow runs
 
 **Setup Instructions:**
 1. **Create Token**: Go to [GitHub Settings > Personal Access Tokens (Beta)](https://github.com/settings/tokens?type=beta)
@@ -36,7 +46,7 @@ To enable all workflows to function properly for external contributors AND cross
    - Name: `CUSTOM_GITHUB_TOKEN`
    - Value: Your generated token
 
-#### Workflow Communication Pattern
+##### Workflow Communication Pattern
 
 ```mermaid
 flowchart TD
@@ -79,19 +89,11 @@ flowchart TD
     style Z fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
-#### Workflow Behavior
+##### Workflow Behavior
 
 - **With Custom Token**: All workflows function properly for external contributors and artifact downloads work
 - **Without Custom Token**: Workflows fail for external contributors and artifact downloads fail with "Resource not accessible by personal access token" errors
 - **Backward Compatible**: Existing setups continue to work without any changes required
-
-## 🚀 GitHub Action (Action Mode Only)
-
-This repository now **only supports the Action mode**. All individual keeper workflows have been removed and consolidated into a single, feature-rich GitHub Action.
-
-### Quick Start
-
-**⚠️ IMPORTANT**: Before using these workflows, ensure you have set up the `CUSTOM_GITHUB_TOKEN` secret as described in the [Token Setup section](#fork-compatibility--token-setup) above. This is **REQUIRED** for fork compatibility and cross-workflow artifact access.
 
 **Basic Triage Only:**
 ```yaml
