@@ -2,11 +2,96 @@
 
 **Complete Repository Automation** is now available as a unified GitHub Action! This project has migrated from individual keeper workflows to a single, powerful action that reduces configuration from ~1,500 lines to just ~20 lines.
 
+## 🔐 Fork Compatibility & Token Setup
+
+### Fork Compatibility Architecture
+
+This repository implements a **fork-compatible architecture** that allows external contributors to trigger labeling workflows seamlessly. The system uses a two-workflow pattern to separate data collection from privileged operations.
+
+#### Problem Statement
+
+Traditional GitHub Actions workflows fail when triggered by pull requests from forks because:
+- Forked repositories don't have access to the original repository's secrets
+- GitHub's default `GITHUB_TOKEN` has limited permissions for external contributors
+- Workflows cannot add labels to pull requests from forks without elevated permissions
+- **Cross-workflow artifact access** requires elevated permissions (artifacts created by trigger workflows cannot be downloaded by main workflows using standard `GITHUB_TOKEN`)
+
+#### Solution: Custom GitHub Token
+
+To enable all workflows to function properly for external contributors AND cross-workflow artifact access, repository administrators **must** create a fine-grained personal access token with the following permissions:
+
+**Required Permissions:**
+- **Actions: Read** - **CRITICAL** for downloading artifacts from trigger workflows
+- **Issues: Write** - Required to add labels to issues
+- **Pull requests: Write** - Required to add labels to pull requests  
+- **Metadata: Read** - Required to access repository information
+
+**Setup Instructions:**
+1. **Create Token**: Go to [GitHub Settings > Personal Access Tokens (Beta)](https://github.com/settings/tokens?type=beta)
+2. **Configure Access**: Select the target repository or choose "All repositories" for organization-wide use
+3. **Set Permissions**: Grant ALL the permissions listed above (especially **Actions: Read**)
+4. **Add to Repository**: Add the token as a repository secret named `CUSTOM_GITHUB_TOKEN`
+   - Go to your repository Settings > Secrets and variables > Actions
+   - Click "New repository secret"
+   - Name: `CUSTOM_GITHUB_TOKEN`
+   - Value: Your generated token
+
+#### Workflow Communication Pattern
+
+```mermaid
+flowchart TD
+    A[PR Created/Updated on Fork] --> FT
+    
+    subgraph FT ["🔄 repository-automation-trigger.yml (Runs on Fork)"]
+        direction TB
+        B[Collect PR Metadata]
+        C[Extract: title, body, draft, etc.]
+        D[Store as pr-metadata.json]
+        E[Upload Artifact]
+        B --> C --> D --> E
+    end
+    
+    FT --> TG[Trigger Action Workflows]
+    
+    subgraph AW ["🎯 Action Workflows (Run on Target Repo)"]
+        direction TB
+        subgraph MA ["repository-automation.yml (Main Automation)"]
+            M1[Download Artifact with CUSTOM_GITHUB_TOKEN] --> M2[Execute Complete Repository Automation] --> M3[Apply All Labels & Features]
+        end
+    end
+    
+    TG --> MA
+    
+    MA --> Z[✅ Complete]
+    
+    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style FT fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
+    style AW fill:#744210,stroke:#b7791f,color:#e2e8f0
+    style MA fill:#1a365d,stroke:#2c5282,color:#e2e8f0
+    style B fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style C fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style D fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style E fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style TG fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style M1 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style M2 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style M3 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
+    style Z fill:#0f5132,stroke:#198754,color:#e2e8f0
+```
+
+#### Workflow Behavior
+
+- **With Custom Token**: All workflows function properly for external contributors and artifact downloads work
+- **Without Custom Token**: Workflows fail for external contributors and artifact downloads fail with "Resource not accessible by personal access token" errors
+- **Backward Compatible**: Existing setups continue to work without any changes required
+
 ## 🚀 GitHub Action (Action Mode Only)
 
 This repository now **only supports the Action mode**. All individual keeper workflows have been removed and consolidated into a single, feature-rich GitHub Action.
 
 ### Quick Start
+
+**⚠️ IMPORTANT**: Before using these workflows, ensure you have set up the `CUSTOM_GITHUB_TOKEN` secret as described in the [Token Setup section](#fork-compatibility--token-setup) above. This is **REQUIRED** for fork compatibility and cross-workflow artifact access.
 
 **Basic Triage Only:**
 ```yaml
@@ -28,6 +113,7 @@ jobs:
       - uses: thenets/repo-automation@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
 ```
 
 **Complete Automation (Reusable Workflow Pattern):**
@@ -63,6 +149,12 @@ on:
         description: 'Dry run mode (true/false)'
         required: false
         default: 'false'
+
+# CRITICAL: These permissions must include 'checks: write' for proper operation
+permissions:
+  issues: write
+  pull-requests: write
+  checks: write
 
 jobs:
   automation:
@@ -518,121 +610,12 @@ flowchart LR
     style G fill:#0f5132,stroke:#198754,color:#e2e8f0
 ```
 
-## Fork Compatibility
-
-This repository implements a **fork-compatible architecture** that allows external contributors to trigger labeling workflows seamlessly. The system uses a two-workflow pattern to separate data collection from privileged operations.
-
-### Problem Statement
-
-Traditional GitHub Actions workflows fail when triggered by pull requests from forks because:
-- Forked repositories don't have access to the original repository's secrets
-- GitHub's default `GITHUB_TOKEN` has limited permissions for external contributors
-- Workflows cannot add labels to pull requests from forks without elevated permissions
-
-### Solution Architecture
-
-We implement a **two-workflow pattern** that separates data collection from privileged operations:
-
-1. **Trigger Workflow** (`repository-automation-trigger`): Runs on any repository (including forks), collects ALL PR metadata as-is
-2. **Main Automation Workflow** (`repository-automation`): Triggered by data collection completion, run only on target repository with full permissions
-
-### Workflow Communication Pattern
-
-```mermaid
-flowchart TD
-    A[PR Created/Updated on Fork] --> FT
-    
-    subgraph FT ["🔄 repository-automation-trigger.yml (Runs on Fork)"]
-        direction TB
-        B[Collect PR Metadata]
-        C[Extract: title, body, draft, etc.]
-        D[Store as pr-metadata.json]
-        E[Upload Artifact]
-        B --> C --> D --> E
-    end
-    
-    FT --> TG[Trigger Action Workflows]
-    
-    subgraph AW ["🎯 Action Workflows (Run on Target Repo)"]
-        direction TB
-        subgraph MA ["repository-automation.yml (Main Automation)"]
-            M1[Download Artifact] --> M2[Execute Complete Repository Automation] --> M3[Apply All Labels & Features]
-        end
-    end
-    
-    TG --> MA
-    
-    MA --> Z[✅ Complete]
-    
-    style A fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style FT fill:#553c9a,stroke:#6b46c1,color:#e2e8f0
-    style AW fill:#744210,stroke:#b7791f,color:#e2e8f0
-    style MA fill:#1a365d,stroke:#2c5282,color:#e2e8f0
-    style B fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style C fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style D fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style E fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style TG fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style M1 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style M2 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style M3 fill:#2d3748,stroke:#4a5568,color:#e2e8f0
-    style Z fill:#0f5132,stroke:#198754,color:#e2e8f0
-```
-
-### Fork Compatibility Status
-
-| Workflow | Fork Compatible | Status | Notes |
-|----------|-----------------|--------|--------|
-| **repository-automation-trigger.yml** | ✅ N/A | ✅ Working | Metadata collection workflow (runs on forks) |
-| **repository-automation.yml** | ✅ Yes | ✅ Complete | Main automation with full GitHub Action features |
-
-### Benefits
-
-1. **External Contributor Friendly**: PRs from forks trigger workflows seamlessly
-2. **Security**: Privileged operations only run on target repository  
-3. **Minimal Changes**: Existing logic preserved, just data source changed
-4. **Performance**: Complete workflow chain executes in ~1-2 minutes
-5. **Backward Compatible**: All existing functionality preserved
-
-## Fine-Grained Token Permissions
-
-### For External Contributors
-
-When external contributors (non-collaborators) create pull requests or issues, the default `GITHUB_TOKEN` has limited permissions and may cause workflows to fail with permission errors. To enable all workflows to function properly for external contributors, repository administrators should create a fine-grained personal access token.
-
-### Required Permissions
-
-**Repository Access:**
-- This repository (or "All repositories" for organization-wide use)
-
-**Repository Permissions:**
-- **Issues: Write** - Required to add labels to issues
-- **Issues: Read** - Required to access issue comments and timeline events
-- **Pull requests: Write** - Required to add labels to pull requests
-- **Pull requests: Read** - Required to list and read pull request details
-- **Metadata: Read** - Required to access repository information
-
-### Setup Instructions
-
-1. **Create Token**: Go to [GitHub Settings > Personal Access Tokens (Beta)](https://github.com/settings/tokens?type=beta)
-2. **Configure Access**: Select the target repository or choose "All repositories" for organization-wide use
-3. **Set Permissions**: Grant all the permissions listed above
-4. **Add to Repository**: Add the token as a repository secret named `CUSTOM_GITHUB_TOKEN`
-   - Go to your repository Settings > Secrets and variables > Actions
-   - Click "New repository secret"
-   - Name: `CUSTOM_GITHUB_TOKEN`
-   - Value: Your generated token
-
-### Workflow Behavior
-
-- **With Custom Token**: All workflows will function properly for external contributors
-- **Without Custom Token**: Workflows may fail for external contributors with clear error messages explaining the setup required
-- **Backward Compatible**: Existing setups continue to work without any changes required
 
 ## Prerequisites
 
 - Repository must have "triage", "stale", and "ready for review" labels created
-- GitHub Actions must have write permissions for issues and pull requests
+- GitHub Actions must have write permissions for issues and pull requests  
+- **CRITICAL**: `CUSTOM_GITHUB_TOKEN` secret must be configured with Actions: Read, Issues: Write, Pull requests: Write, and Metadata: Read permissions (see [Token Setup](#fork-compatibility--token-setup))
 - Workflows require `GITHUB_TOKEN` with appropriate scopes
 
 ## Usage
