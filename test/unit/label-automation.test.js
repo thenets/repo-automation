@@ -213,24 +213,25 @@ describe('LabelAutomation', () => {
     test('should return empty result when no release value', async () => {
       mockConfig.parseYamlValue.mockReturnValue(null);
       
-      const result = await labelAutomation.processReleaseLabel('yaml-content', false);
+      const result = await labelAutomation.processReleaseLabel('yaml-content', []);
       
       expect(result).toEqual({ labels: [], error: null });
     });
 
-    test('should skip when release label already exists', async () => {
+    test('should preserve existing release label when it exists', async () => {
       mockConfig.parseYamlValue.mockReturnValue('1.0');
+      mockConfig.validateReleaseValue.mockReturnValue(true);
       
-      const result = await labelAutomation.processReleaseLabel('yaml-content', true);
+      const result = await labelAutomation.processReleaseLabel('yaml-content', ['release-1.0']);
       
-      expect(result).toEqual({ labels: [], error: null });
+      expect(result).toEqual({ labels: ['release-1.0'], error: null });
     });
 
     test('should process valid single release value', async () => {
       mockConfig.parseYamlValue.mockReturnValue('1.0');
       mockConfig.validateReleaseValue.mockReturnValue(true);
       
-      const result = await labelAutomation.processReleaseLabel('yaml-content', false);
+      const result = await labelAutomation.processReleaseLabel('yaml-content', []);
       
       expect(result).toEqual({ 
         labels: ['release-1.0'], 
@@ -242,7 +243,7 @@ describe('LabelAutomation', () => {
       mockConfig.parseYamlValue.mockReturnValue('2.0');
       mockConfig.validateReleaseValue.mockReturnValue(false);
       
-      const result = await labelAutomation.processReleaseLabel('yaml-content', false);
+      const result = await labelAutomation.processReleaseLabel('yaml-content', []);
       
       expect(result.error).toContain('Invalid release value: "2.0"');
       expect(result.labels).toEqual([]);
@@ -257,7 +258,7 @@ describe('LabelAutomation', () => {
       mockConfig.getInvalidValues.mockReturnValue([]);
       mockConfig.getValidValues.mockReturnValue(['1.0', '1.1']);
       
-      const result = await labelAutomation.processReleaseLabel('yaml-content', false);
+      const result = await labelAutomation.processReleaseLabel('yaml-content', []);
       
       expect(result).toEqual({ 
         labels: ['release-1.0', 'release-1.1'], 
@@ -273,7 +274,7 @@ describe('LabelAutomation', () => {
       ]);
       mockConfig.getInvalidValues.mockReturnValue(['2.0']);
       
-      const result = await labelAutomation.processReleaseLabel('yaml-content', false);
+      const result = await labelAutomation.processReleaseLabel('yaml-content', []);
       
       expect(result.error).toContain('Invalid release values: "2.0"');
       expect(result.labels).toEqual([]);
@@ -288,7 +289,7 @@ describe('LabelAutomation', () => {
     test('should return empty result when no backport value', async () => {
       mockConfig.parseYamlValue.mockReturnValue(null);
       
-      const result = await labelAutomation.processBackportLabel('yaml-content', false);
+      const result = await labelAutomation.processBackportLabel('yaml-content', []);
       
       expect(result).toEqual({ labels: [], error: null });
     });
@@ -297,7 +298,7 @@ describe('LabelAutomation', () => {
       mockConfig.parseYamlValue.mockReturnValue('main');
       mockConfig.validateBackportValue.mockReturnValue(true);
       
-      const result = await labelAutomation.processBackportLabel('yaml-content', false);
+      const result = await labelAutomation.processBackportLabel('yaml-content', []);
       
       expect(result).toEqual({ 
         labels: ['backport-main'], 
@@ -309,7 +310,7 @@ describe('LabelAutomation', () => {
       mockConfig.parseYamlValue.mockReturnValue('feature');
       mockConfig.validateBackportValue.mockReturnValue(false);
       
-      const result = await labelAutomation.processBackportLabel('yaml-content', false);
+      const result = await labelAutomation.processBackportLabel('yaml-content', []);
       
       expect(result.error).toContain('Invalid backport value: "feature"');
       expect(result.labels).toEqual([]);
@@ -392,8 +393,8 @@ describe('LabelAutomation', () => {
       
       await labelAutomation.processReleaseBackportLabeling(mockPR, 'yaml-content', features);
       
-      expect(labelAutomation.processReleaseLabel).toHaveBeenCalledWith('yaml-content', true);
-      expect(labelAutomation.processBackportLabel).toHaveBeenCalledWith('yaml-content', true);
+      expect(labelAutomation.processReleaseLabel).toHaveBeenCalledWith('yaml-content', ['release-1.0', 'backport-main']);
+      expect(labelAutomation.processBackportLabel).toHaveBeenCalledWith('yaml-content', ['release-1.0', 'backport-main']);
     });
 
     test('should add labels when validation passes', async () => {

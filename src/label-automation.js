@@ -209,14 +209,12 @@ class LabelAutomation {
       const validationErrors = [];
       const labelsToAdd = [];
 
-      // Check existing labels to avoid overwriting manual labels
+      // Get current labels to support incremental additions
       const currentLabels = await this.client.getLabels(prNumber);
-      const hasExistingReleaseLabel = currentLabels.some(label => label.startsWith('release-'));
-      const hasExistingBackportLabel = currentLabels.some(label => label.startsWith('backport-'));
 
       // Process release labeling
       if (features.releaseLabeling) {
-        const releaseResult = await this.processReleaseLabel(yamlContent, hasExistingReleaseLabel);
+        const releaseResult = await this.processReleaseLabel(yamlContent, currentLabels);
         if (releaseResult.error) {
           validationErrors.push(releaseResult.error);
         } else if (releaseResult.labels && releaseResult.labels.length > 0) {
@@ -226,7 +224,7 @@ class LabelAutomation {
 
       // Process backport labeling
       if (features.backportLabeling) {
-        const backportResult = await this.processBackportLabel(yamlContent, hasExistingBackportLabel);
+        const backportResult = await this.processBackportLabel(yamlContent, currentLabels);
         if (backportResult.error) {
           validationErrors.push(backportResult.error);
         } else if (backportResult.labels && backportResult.labels.length > 0) {
@@ -302,17 +300,12 @@ class LabelAutomation {
 
   /**
    * Process release label from YAML (supports both single values and arrays)
+   * Now supports incremental additions - only adds labels that don't already exist
    */
-  async processReleaseLabel(yamlContent, hasExistingLabel) {
+  async processReleaseLabel(yamlContent, currentLabels) {
     const releaseValue = this.config.parseYamlValue(yamlContent, 'release');
     
     if (!releaseValue) {
-      return { labels: [], error: null };
-    }
-
-    if (hasExistingLabel) {
-      const displayValue = Array.isArray(releaseValue) ? JSON.stringify(releaseValue) : releaseValue;
-      console.log(`Release label already exists, skipping automatic assignment of "release-${displayValue}"`);
       return { labels: [], error: null };
     }
 
@@ -332,15 +325,35 @@ class LabelAutomation {
       }
       
       if (validValues.length > 0) {
-        const labels = validValues.map(v => `release-${v}`);
+        // Generate all potential labels from YAML
+        const yamlLabels = validValues.map(v => `release-${v}`);
+        
+        // Get existing release labels
+        const existingReleaseLabels = currentLabels.filter(label => label.startsWith('release-'));
+        
+        // Combine existing labels with new ones (preserve existing, add new)
+        const allLabels = [...new Set([...existingReleaseLabels, ...yamlLabels])];
+        
         console.log(`Found valid release values: ${validValues.join(', ')}`);
-        return { labels, error: null };
+        console.log(`Existing release labels: ${existingReleaseLabels.join(', ') || 'none'}`);
+        console.log(`Labels to ensure: ${allLabels.join(', ')}`);
+        
+        return { labels: allLabels, error: null };
       }
     } else {
       // Handle single value (backward compatibility)
       if (validationResult) {
+        const yamlLabel = `release-${releaseValue}`;
+        const existingReleaseLabels = currentLabels.filter(label => label.startsWith('release-'));
+        
+        // Combine existing labels with the new one
+        const allLabels = [...new Set([...existingReleaseLabels, yamlLabel])];
+        
         console.log(`Found valid release: ${releaseValue}`);
-        return { labels: [`release-${releaseValue}`], error: null };
+        console.log(`Existing release labels: ${existingReleaseLabels.join(', ') || 'none'}`);
+        console.log(`Labels to ensure: ${allLabels.join(', ')}`);
+        
+        return { labels: allLabels, error: null };
       } else {
         const acceptedReleases = this.config.getAcceptedReleases();
         return { 
@@ -355,17 +368,12 @@ class LabelAutomation {
 
   /**
    * Process backport label from YAML (supports both single values and arrays)
+   * Now supports incremental additions - only adds labels that don't already exist
    */
-  async processBackportLabel(yamlContent, hasExistingLabel) {
+  async processBackportLabel(yamlContent, currentLabels) {
     const backportValue = this.config.parseYamlValue(yamlContent, 'backport');
     
     if (!backportValue) {
-      return { labels: [], error: null };
-    }
-
-    if (hasExistingLabel) {
-      const displayValue = Array.isArray(backportValue) ? JSON.stringify(backportValue) : backportValue;
-      console.log(`Backport label already exists, skipping automatic assignment of "backport-${displayValue}"`);
       return { labels: [], error: null };
     }
 
@@ -385,15 +393,35 @@ class LabelAutomation {
       }
       
       if (validValues.length > 0) {
-        const labels = validValues.map(v => `backport-${v}`);
+        // Generate all potential labels from YAML
+        const yamlLabels = validValues.map(v => `backport-${v}`);
+        
+        // Get existing backport labels
+        const existingBackportLabels = currentLabels.filter(label => label.startsWith('backport-'));
+        
+        // Combine existing labels with new ones (preserve existing, add new)
+        const allLabels = [...new Set([...existingBackportLabels, ...yamlLabels])];
+        
         console.log(`Found valid backport values: ${validValues.join(', ')}`);
-        return { labels, error: null };
+        console.log(`Existing backport labels: ${existingBackportLabels.join(', ') || 'none'}`);
+        console.log(`Labels to ensure: ${allLabels.join(', ')}`);
+        
+        return { labels: allLabels, error: null };
       }
     } else {
       // Handle single value (backward compatibility)
       if (validationResult) {
+        const yamlLabel = `backport-${backportValue}`;
+        const existingBackportLabels = currentLabels.filter(label => label.startsWith('backport-'));
+        
+        // Combine existing labels with the new one
+        const allLabels = [...new Set([...existingBackportLabels, yamlLabel])];
+        
         console.log(`Found valid backport: ${backportValue}`);
-        return { labels: [`backport-${backportValue}`], error: null };
+        console.log(`Existing backport labels: ${existingBackportLabels.join(', ') || 'none'}`);
+        console.log(`Labels to ensure: ${allLabels.join(', ')}`);
+        
+        return { labels: allLabels, error: null };
       } else {
         const acceptedBackports = this.config.getAcceptedBackports();
         return { 
