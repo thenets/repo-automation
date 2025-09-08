@@ -466,6 +466,42 @@ class GitHubClient {
       throw error;
     }
   }
+
+  /**
+   * Create a repository label
+   * @param {string} name - Label name
+   * @param {string} color - Hex color code (without #)
+   * @param {string} description - Label description
+   * @returns {Object} - Created label details
+   */
+  async createRepositoryLabel(name, color, description) {
+    if (this.config.isDryRun()) {
+      logger.log(`🧪 DRY RUN: Would create repository label "${name}" with color ${color}`);
+      return { name, color, description };
+    }
+
+    try {
+      const label = await this.github.rest.issues.createLabel({
+        owner: this.owner,
+        repo: this.repo,
+        name: name,
+        color: color,
+        description: description
+      });
+
+      logger.log(`✅ Successfully created repository label "${name}" with color ${color}`);
+      return label.data;
+
+    } catch (error) {
+      if (error.status === 422 && error.response?.data?.errors?.[0]?.code === 'already_exists') {
+        logger.info(`ℹ️ Repository label "${name}" already exists - this is expected behavior`);
+        return { name, color, description };
+      } else {
+        logger.error(`❌ Error creating repository label "${name}": ${error.message}`);
+        throw error;
+      }
+    }
+  }
 }
 
 module.exports = { GitHubClient };

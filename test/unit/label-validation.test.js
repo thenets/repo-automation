@@ -22,7 +22,8 @@ describe('Label Validation', () => {
           addLabels: jest.fn(),
           createComment: jest.fn(),
           listComments: jest.fn(),
-          deleteComment: jest.fn()
+          deleteComment: jest.fn(),
+          createLabel: jest.fn()
         }
       }
     };
@@ -204,8 +205,89 @@ describe('Label Validation', () => {
       expect(mockGitHub.rest.issues.addLabels).toHaveBeenCalled();
     });
 
-    test('should fail with clear error when repository labels are missing', async () => {
+    test('should create missing labels when they correspond to valid values', async () => {
       // Mock repository without the required labels
+      mockGitHub.rest.issues.listLabelsForRepo.mockResolvedValue({
+        data: [
+          { name: 'bug' },
+          { name: 'enhancement' }
+        ]
+      });
+
+      // Mock label creation
+      mockGitHub.rest.issues.createLabel.mockResolvedValue({});
+      
+      // Mock successful label addition after creation
+      mockGitHub.rest.issues.addLabels.mockResolvedValue({});
+
+      const features = { releaseLabeling: true, backportLabeling: true };
+      
+      const result = await automation.execute(features);
+      
+      // Verify labels were created
+      expect(mockGitHub.rest.issues.createLabel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          name: 'release-2.1',
+          color: '00FF00',
+          description: 'Release 2.1'
+        })
+      );
+      
+      expect(mockGitHub.rest.issues.createLabel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          name: 'backport-1.5',
+          color: '0000FF',
+          description: 'Backport to 1.5'
+        })
+      );
+      
+      // Verify labels were added to PR
+      expect(result.labelsAdded).toContain('release-2.1');
+      expect(result.labelsAdded).toContain('backport-1.5');
+    });
+
+    test('should handle partial label existence and create missing valid labels', async () => {
+      // Mock repository with only release label, missing backport label
+      mockGitHub.rest.issues.listLabelsForRepo.mockResolvedValue({
+        data: [
+          { name: 'bug' },
+          { name: 'release-2.1' }
+        ]
+      });
+
+      // Mock label creation for missing backport label
+      mockGitHub.rest.issues.createLabel.mockResolvedValue({});
+      
+      // Mock successful label addition
+      mockGitHub.rest.issues.addLabels.mockResolvedValue({});
+
+      const features = { releaseLabeling: true, backportLabeling: true };
+      
+      const result = await automation.execute(features);
+      
+      // Verify only the missing backport label was created
+      expect(mockGitHub.rest.issues.createLabel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backport-1.5',
+          color: '0000FF',
+          description: 'Backport to 1.5'
+        })
+      );
+      
+      // Verify both labels were added to PR
+      expect(result.labelsAdded).toContain('release-2.1');
+      expect(result.labelsAdded).toContain('backport-1.5');
+    });
+
+    test('should fail when labels for invalid values cannot be created', async () => {
+      // Update context with invalid values not in accepted lists
+      automation.context.payload.pull_request.body = '```yaml\nrelease: 999.999\nbackport: invalid-version\n```';
+
+      // Mock repository without any labels
       mockGitHub.rest.issues.listLabelsForRepo.mockResolvedValue({
         data: [
           { name: 'bug' },
@@ -219,48 +301,14 @@ describe('Label Validation', () => {
       const features = { releaseLabeling: true, backportLabeling: true };
       
       await expect(automation.execute(features)).rejects.toThrow(
-        'Label validation failed: ❌ Repository labels do not exist: "release-2.1", "backport-1.5"'
+        'Label validation failed'
       );
 
-      // Verify error comment was posted
-      expect(mockGitHub.rest.issues.createComment).toHaveBeenCalledWith(
-        expect.objectContaining({
-          owner: 'test-owner',
-          repo: 'test-repo',
-          issue_number: 123,
-          body: expect.stringContaining('🚨 YAML Validation Error')
-        })
-      );
-
-      // Verify the comment includes repository admin instructions
-      const commentCall = mockGitHub.rest.issues.createComment.mock.calls[0][0];
-      expect(commentCall.body).toContain('For Repository Administrators');
-      expect(commentCall.body).toContain('Missing repository labels detected');
-      expect(commentCall.body).toContain('Go to repository **Settings** → **Labels**');
-    });
-
-    test('should handle partial label existence', async () => {
-      // Mock repository with only release label, missing backport label
-      mockGitHub.rest.issues.listLabelsForRepo.mockResolvedValue({
-        data: [
-          { name: 'bug' },
-          { name: 'release-2.1' }
-        ]
-      });
-
-      // Mock comment posting
-      mockGitHub.rest.issues.createComment.mockResolvedValue({});
-
-      const features = { releaseLabeling: true, backportLabeling: true };
+      // Verify createLabel was NOT called (invalid values shouldn't create labels)
+      expect(mockGitHub.rest.issues.createLabel).not.toHaveBeenCalled();
       
-      await expect(automation.execute(features)).rejects.toThrow(
-        'Label validation failed: ❌ Repository labels do not exist: "backport-1.5"'
-      );
-
-      // Verify error comment mentions only the missing label
-      const commentCall = mockGitHub.rest.issues.createComment.mock.calls[0][0];
-      expect(commentCall.body).toContain('"backport-1.5"');
-      expect(commentCall.body).not.toContain('"release-2.1"');
+      // Verify error comment was posted
+      expect(mockGitHub.rest.issues.createComment).toHaveBeenCalled();
     });
 
     test('should handle YAML validation errors separately from repository label errors', async () => {

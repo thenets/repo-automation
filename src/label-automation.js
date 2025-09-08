@@ -234,14 +234,42 @@ class LabelAutomation {
         }
       }
 
-      // Validate repository label existence before proceeding
+      // Validate repository label existence and create missing labels for valid values
       if (labelsToAdd.length > 0) {
         const labelValidation = await this.client.validateRepositoryLabels(labelsToAdd);
         if (!labelValidation.valid) {
           const missingLabels = labelValidation.missing;
-          const repositoryLabelError = `❌ Repository labels do not exist: ${missingLabels.map(l => `"${l}"`).join(', ')}. ` +
-            `Repository administrators must create these labels in the repository settings before they can be used.`;
-          validationErrors.push(repositoryLabelError);
+          const createdLabels = [];
+          const failedLabels = [];
+
+          // Attempt to create missing labels for valid release/backport values
+          for (const missingLabel of missingLabels) {
+            try {
+              if (this.isValidLabelForCreation(missingLabel)) {
+                const { color, description } = this.getLabelMetadata(missingLabel);
+                await this.client.createRepositoryLabel(missingLabel, color, description);
+                createdLabels.push(missingLabel);
+                logger.log(`✅ Created missing repository label: ${missingLabel}`);
+              } else {
+                failedLabels.push(missingLabel);
+              }
+            } catch (error) {
+              logger.error(`❌ Failed to create repository label "${missingLabel}": ${error.message}`);
+              failedLabels.push(missingLabel);
+            }
+          }
+
+          // Only report errors for labels that couldn't be created
+          if (failedLabels.length > 0) {
+            const repositoryLabelError = `❌ Repository labels do not exist and could not be created: ${failedLabels.map(l => `"${l}"`).join(', ')}. ` +
+              `Repository administrators must create these labels in the repository settings before they can be used.`;
+            validationErrors.push(repositoryLabelError);
+          }
+
+          // Log successful creations
+          if (createdLabels.length > 0) {
+            logger.log(`✅ Successfully created ${createdLabels.length} missing repository label(s): ${createdLabels.join(', ')}`);
+          }
         }
       }
 
@@ -489,6 +517,53 @@ class LabelAutomation {
     await this.client.createComment(prNumber, errorComment);
     this.result.actions.push(`Posted validation error comment to PR #${prNumber}`);
     console.log('💬 Posted validation error comment to PR');
+  }
+
+  /**
+   * Check if a label is valid for automatic creation
+   * Only release-* and backport-* labels for valid values should be created
+   */
+  isValidLabelForCreation(labelName) {
+    if (labelName.startsWith('release-')) {
+      const version = labelName.substring('release-'.length);
+      const acceptedReleases = this.config.getAcceptedReleases();
+      return acceptedReleases.includes(version);
+    }
+    
+    if (labelName.startsWith('backport-')) {
+      const version = labelName.substring('backport-'.length);
+      const acceptedBackports = this.config.getAcceptedBackports();
+      return acceptedBackports.includes(version);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Get label metadata (color and description) for automatic creation
+   */
+  getLabelMetadata(labelName) {
+    if (labelName.startsWith('release-')) {
+      const version = labelName.substring('release-'.length);
+      return {
+        color: '00FF00', // Green for releases
+        description: `Release ${version}`
+      };
+    }
+    
+    if (labelName.startsWith('backport-')) {
+      const version = labelName.substring('backport-'.length);
+      return {
+        color: '0000FF', // Blue for backports  
+        description: `Backport to ${version}`
+      };
+    }
+    
+    // Default fallback (shouldn't be reached if isValidLabelForCreation is used properly)
+    return {
+      color: 'CCCCCC',
+      description: 'Automatically created label'
+    };
   }
 
   /**
