@@ -146,7 +146,50 @@ class LabelAutomation {
       const metadataContent = fs.readFileSync(metadataPath, 'utf8');
       const metadata = JSON.parse(metadataContent);
       
-      logger.log(`📦 Loaded metadata: ${metadata.type} #${metadata.number} by ${metadata.author.login}`);
+      // Decode base64 encoded fields if present
+      if (metadata.encoding) {
+        if (metadata.encoding.title === 'base64' && metadata.title_base64 !== undefined) {
+          try {
+            // Handle empty strings
+            if (metadata.title_base64 === '') {
+              metadata.title = '';
+              logger.log('✅ Decoded empty base64 title field');
+            } else {
+              // Validate base64 format before decoding
+              if (!/^[A-Za-z0-9+/]*={0,2}$/.test(metadata.title_base64)) {
+                logger.log(`⚠️ Invalid base64 format in title field`);
+              } else {
+                metadata.title = Buffer.from(metadata.title_base64, 'base64').toString('utf8');
+                logger.log('✅ Decoded base64 title field');
+              }
+            }
+          } catch (error) {
+            logger.log(`⚠️ Failed to decode base64 title: ${error.message}`);
+          }
+        }
+        
+        if (metadata.encoding.body === 'base64' && metadata.body_base64 !== undefined) {
+          try {
+            // Handle empty strings
+            if (metadata.body_base64 === '') {
+              metadata.body = '';
+              logger.log('✅ Decoded empty base64 body field');
+            } else {
+              // Validate base64 format before decoding
+              if (!/^[A-Za-z0-9+/]*={0,2}$/.test(metadata.body_base64)) {
+                logger.log(`⚠️ Invalid base64 format in body field`);
+              } else {
+                metadata.body = Buffer.from(metadata.body_base64, 'base64').toString('utf8');
+                logger.log('✅ Decoded base64 body field');
+              }
+            }
+          } catch (error) {
+            logger.log(`⚠️ Failed to decode base64 body: ${error.message}`);
+          }
+        }
+      }
+      
+      logger.log(`📦 Loaded metadata: ${metadata.type} #${metadata.number} by ${metadata.author ? metadata.author.login : 'unknown'}`);
       
       return metadata;
       
