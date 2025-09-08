@@ -254,134 +254,102 @@ class RepositoryAutomation {
   }
 
   /**
+   * Find the end position of a JSON string value, handling escaped quotes
+   */
+  findStringEnd(content, startPos) {
+    let pos = startPos;
+    let escaped = false;
+    
+    while (pos < content.length) {
+      const char = content[pos];
+      
+      if (escaped) {
+        escaped = false; // Skip this character
+      } else if (char === '\\') {
+        escaped = true; // Next character is escaped
+      } else if (char === '"') {
+        return pos; // Found the end quote
+      }
+      
+      pos++;
+    }
+    
+    return -1; // No closing quote found
+  }
+
+  /**
    * Sanitize JSON content to fix common issues in specific fields
    */
   sanitizeJsonContent(content) {
     try {
-      console.log('🔧 Starting line-by-line sanitization...');
+      console.log('🔧 Starting position-based JSON sanitization...');
       
-      const lines = content.split('\n');
-      const result = [];
-      let inBodyField = false;
-      let inTitleField = false;
-      let fieldContent = [];
-      let currentField = null;
+      let result = content;
+      const fieldsToSanitize = ['body', 'title']; // Process body first (later in content) to avoid position shifts
       
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+      for (const fieldName of fieldsToSanitize) {
+        // Find all occurrences of the field (there should typically be only one)
+        const fieldSearch = `"${fieldName}": "`;
+        let fieldPos = -1;
+        let searchStart = 0;
         
-        // Check if we're starting a body or title field
-        if (line.match(/^\s*"body"\s*:\s*"/) || line.match(/^\s*"title"\s*:\s*"/)) {
-          currentField = line.match(/^\s*"(body|title)"\s*:\s*"/)[1];
-          console.log(`🎯 Found start of "${currentField}" field at line ${i + 1}`);
-          
-          if (currentField === 'body') inBodyField = true;
-          if (currentField === 'title') inTitleField = true;
-          
-          // Check if the field ends on the same line
-          if (line.match(/",?\s*$/)) {
-            // Single-line field, extract and escape the content
-            const match = line.match(/^\s*"(body|title)"\s*:\s*"(.*)(",?\s*)$/);
-            if (match) {
-              const fieldName = match[1];
-              const value = match[2];
-              const suffix = match[3];
-              
-              console.log(`📝 Single-line "${fieldName}" value: ${value.substring(0, 100)}${value.length > 100 ? '...' : ''}`);
-              
-              const escapedValue = value
-                .replace(/\\/g, '\\\\')
-                .replace(/"/g, '\\"')
-                .replace(/\n/g, '\\n')
-                .replace(/\r/g, '\\r')
-                .replace(/\t/g, '\\t');
-              
-              const escapedLine = `  "${fieldName}": "${escapedValue}"${suffix}`;
-              result.push(escapedLine);
-              
-              console.log(`✅ Escaped single-line "${fieldName}" field`);
-              inBodyField = inTitleField = false;
-              currentField = null;
-            } else {
-              result.push(line);
-            }
-          } else {
-            // Multi-line field starts here, store the opening
-            fieldContent = [line];
-          }
+        // Find the last occurrence to process from right to left
+        while (true) {
+          const nextPos = result.indexOf(fieldSearch, searchStart);
+          if (nextPos === -1) break;
+          fieldPos = nextPos;
+          searchStart = nextPos + 1;
         }
-        // Check if we're ending a multi-line field  
-        else if ((inBodyField || inTitleField) && line.match(/^\s*"/)) {
-          console.log(`🏁 Found end of "${currentField}" field at line ${i + 1}`);
-          
-          // Add this line to field content
-          fieldContent.push(line);
-          
-          // Extract and rebuild the multi-line field
-          console.log(`📝 Multi-line "${currentField}" content (${fieldContent.length} lines)`);
-          
-          // Extract just the content between quotes (excluding the structural parts)
-          const firstLine = fieldContent[0];
-          const lastLine = fieldContent[fieldContent.length - 1];
-          
-          // Get content from first line after the opening quote
-          const firstMatch = firstLine.match(/^\s*"(body|title)"\s*:\s*"(.*)$/);
-          const lastMatch = lastLine.match(/^(.*)(",?\s*)$/);
-          
-          if (firstMatch && lastMatch) {
-            const fieldName = firstMatch[1];
-            let content = firstMatch[2]; // Content from first line
-            
-            // Add middle lines
-            for (let j = 1; j < fieldContent.length - 1; j++) {
-              content += '\n' + fieldContent[j];
-            }
-            
-            // Add content from last line (excluding closing quote and comma)
-            const lastContent = lastMatch[1];
-            content += '\n' + lastContent;
-            
-            // Escape the content
-            const escapedContent = content
-              .replace(/\\/g, '\\\\')
-              .replace(/"/g, '\\"')
-              .replace(/\n/g, '\\n')
-              .replace(/\r/g, '\\r')
-              .replace(/\t/g, '\\t');
-            
-            const suffix = lastMatch[2];
-            const escapedField = `  "${fieldName}": "${escapedContent}"${suffix}`;
-            result.push(escapedField);
-            
-            console.log(`✅ Escaped multi-line "${fieldName}" field`);
-          } else {
-            // Fallback: add the lines as-is if we can't parse them
-            result.push(...fieldContent);
-            console.log(`⚠️ Could not parse multi-line "${currentField}" field, added as-is`);
-          }
-          
-          // Reset state
-          inBodyField = inTitleField = false;
-          currentField = null;
-          fieldContent = [];
+        
+        if (fieldPos === -1) {
+          console.log(`ℹ️ Field "${fieldName}" not found`);
+          continue;
         }
-        // We're in the middle of a multi-line field
-        else if (inBodyField || inTitleField) {
-          fieldContent.push(line);
+        
+        console.log(`🎯 Found "${fieldName}" field at position ${fieldPos}`);
+        
+        // Find the start of the value (after the opening quote)
+        const valueStart = fieldPos + fieldSearch.length;
+        
+        // Find the end of the value (before the closing quote)
+        const valueEnd = this.findStringEnd(result, valueStart);
+        
+        if (valueEnd === -1) {
+          console.log(`⚠️ Could not find closing quote for "${fieldName}" field`);
+          continue;
         }
-        // Regular line, not part of body or title field
-        else {
-          result.push(line);
+        
+        // Extract the raw value
+        const rawValue = result.substring(valueStart, valueEnd);
+        console.log(`📝 Raw "${fieldName}" value length: ${rawValue.length} chars`);
+        console.log(`📝 First 100 chars: ${rawValue.substring(0, 100)}${rawValue.length > 100 ? '...' : ''}`);
+        
+        // Check if the value needs escaping
+        if (rawValue.includes('\n') || rawValue.includes('\r') || rawValue.includes('\t') || rawValue.includes('"')) {
+          // Escape the value
+          const escapedValue = rawValue
+            .replace(/\\/g, '\\\\')   // Escape existing backslashes first
+            .replace(/"/g, '\\"')     // Escape quotes
+            .replace(/\n/g, '\\n')    // Escape newlines
+            .replace(/\r/g, '\\r')    // Escape carriage returns
+            .replace(/\t/g, '\\t');   // Escape tabs
+          
+          // Replace the value in the result
+          result = result.substring(0, valueStart) + escapedValue + result.substring(valueEnd);
+          
+          console.log(`✅ Escaped "${fieldName}" field`);
+          console.log(`📝 Escaped length: ${escapedValue.length} chars`);
+        } else {
+          console.log(`ℹ️ "${fieldName}" field needs no escaping`);
         }
       }
       
-      const sanitized = result.join('\n');
-      console.log(`🏁 Line-by-line sanitization complete. Content ${sanitized === content ? 'unchanged' : 'modified'}`);
-      
-      return sanitized;
+      console.log('🏁 Position-based sanitization complete');
+      return result;
       
     } catch (error) {
       console.log(`⚠️ Failed to sanitize JSON content: ${error.message}`);
+      console.log(`📄 Error stack: ${error.stack}`);
       return content;
     }
   }
