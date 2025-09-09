@@ -321,6 +321,24 @@ debug-test-env: _gh_auth_check_env ## Test .env configuration and show current s
 	echo "" && \
 	echo "✅ Configuration is working correctly!"
 
+.PHONY: publish
+publish: export TAG_NAME=v1
+publish: ## Publish TAG_NAME tag to latest commit on main branch
+	@echo "Publishing $(TAG_NAME) tag to latest commit on main branch..."
+	@git checkout main
+	@git pull origin main
+	@LATEST_COMMIT=$$(git rev-parse HEAD) && \
+	echo "Latest commit on main: $$LATEST_COMMIT" && \
+	echo "Deleting remote $(TAG_NAME) tag..." && \
+	git push --delete origin $(TAG_NAME) 2>/dev/null || echo "Remote $(TAG_NAME) tag doesn't exist" && \
+	echo "Deleting local $(TAG_NAME) tag..." && \
+	git tag -d $(TAG_NAME) 2>/dev/null || echo "Local $(TAG_NAME) tag doesn't exist" && \
+	echo "Creating new $(TAG_NAME) tag at $$LATEST_COMMIT..." && \
+	git tag $(TAG_NAME) $$LATEST_COMMIT && \
+	echo "Pushing $(TAG_NAME) tag to remote..." && \
+	git push origin $(TAG_NAME) && \
+	echo "✅ $(TAG_NAME) tag published successfully!"
+
 .PHONY: debug-clean-labels
 debug-clean-labels: _gh_auth_check_env ## Delete all labels from repository using .env configuration
 	@echo "⚠️  WARNING: This will delete ALL labels from the repository!"
