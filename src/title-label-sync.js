@@ -33,7 +33,8 @@ class TitleLabelSync {
   async execute(prData) {
     const prNumber = prData.number;
     const currentTitle = prData.title;
-    const action = this.context.payload.action;
+    // For workflow_run events, use event_action from metadata; otherwise use context action
+    const action = prData.event_action || this.context.payload.action;
 
     logger.log(`\n🔄 Title-Label Sync: Analyzing PR #${prNumber}`);
     logger.log(`   Action: ${action}`);
@@ -56,6 +57,9 @@ class TitleLabelSync {
       } else if (action === 'labeled' || action === 'unlabeled') {
         // Labels were changed - sync title to match labels, then title wins
         await this.syncLabelsToTitle(prNumber, currentTitle, currentStatusLabels);
+      } else if (action === 'opened') {
+        // PR was opened - sync labels to match title (title is source of truth)
+        await this.syncTitleToLabels(prNumber, currentTitle, currentStatusLabels);
       }
 
       return this.result;
@@ -172,7 +176,7 @@ class TitleLabelSync {
     }
 
     // Only sync on specific actions
-    const syncActions = ['edited', 'labeled', 'unlabeled'];
+    const syncActions = ['opened', 'edited', 'labeled', 'unlabeled'];
     if (!syncActions.includes(action)) {
       return false;
     }
