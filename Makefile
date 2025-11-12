@@ -339,6 +339,23 @@ publish: ## Publish TAG_NAME tag to latest commit on main branch
 	git push origin $(TAG_NAME) && \
 	echo "✅ $(TAG_NAME) tag published successfully!"
 
+.PHONY: publish-beta
+publish-beta: ## Publish beta tag to latest commit on main branch
+	@echo "Publishing beta tag to latest commit on main branch..."
+	@git checkout main
+	@git pull origin main
+	@LATEST_COMMIT=$$(git rev-parse HEAD) && \
+	echo "Latest commit on main: $$LATEST_COMMIT" && \
+	echo "Deleting remote beta tag..." && \
+	git push --delete origin beta 2>/dev/null || echo "Remote beta tag doesn't exist" && \
+	echo "Deleting local beta tag..." && \
+	git tag -d beta 2>/dev/null || echo "Local beta tag doesn't exist" && \
+	echo "Creating new beta tag at $$LATEST_COMMIT..." && \
+	git tag beta $$LATEST_COMMIT && \
+	echo "Pushing beta tag to remote..." && \
+	git push origin beta && \
+	echo "✅ beta tag published successfully!"
+
 .PHONY: debug-clean-labels
 debug-clean-labels: _gh_auth_check_env ## Delete all labels from repository using .env configuration
 	@echo "⚠️  WARNING: This will delete ALL labels from the repository!"
