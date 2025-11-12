@@ -50,13 +50,31 @@ class TitleLabelSync {
 
       logger.log(`   Current status labels: [${currentStatusLabels.join(', ')}]`);
 
+      // Extract status indicators from title to determine desired state
+      const titleStatuses = extractStatusIndicators(currentTitle);
+
       // Determine sync direction based on event action
       if (action === 'edited') {
         // Title was edited - sync labels to match title (title is source of truth)
         await this.syncTitleToLabels(prNumber, currentTitle, currentStatusLabels);
       } else if (action === 'labeled' || action === 'unlabeled') {
-        // Labels were changed - sync title to match labels, then title wins
-        await this.syncLabelsToTitle(prNumber, currentTitle, currentStatusLabels);
+        // Labels were changed - but only sync if status labels changed
+        // Check if there's a mismatch between title and labels
+        const labelsToAdd = titleStatuses.filter(status =>
+          !currentStatusLabels.includes(status)
+        );
+        const labelsToRemove = currentStatusLabels.filter(label =>
+          !titleStatuses.includes(label.toLowerCase())
+        );
+
+        // Only sync if there are status label changes needed
+        if (labelsToAdd.length > 0 || labelsToRemove.length > 0) {
+          // Sync labels to match title (title is source of truth)
+          await this.syncTitleToLabels(prNumber, currentTitle, currentStatusLabels);
+        } else {
+          logger.log(`   ℹ️ No status label changes needed, skipping sync`);
+          this.result.reason = 'No status label changes needed';
+        }
       } else if (action === 'opened') {
         // PR was opened - sync labels to match title (title is source of truth)
         await this.syncTitleToLabels(prNumber, currentTitle, currentStatusLabels);
