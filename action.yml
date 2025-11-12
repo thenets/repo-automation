@@ -32,6 +32,10 @@ inputs:
   stale-days:
     description: 'Days before marking PRs as stale (number) - enables stale detection'
     required: false
+  enable-title-label-sync:
+    description: 'Enable bi-directional sync between PR titles and labels (POC, WIP, HOLD) - enabled by default'
+    required: false
+    default: 'true'
 
 outputs:
   labels-added:
@@ -202,7 +206,8 @@ runs:
             acceptedReleases: '${{ inputs.accepted-releases }}' ? JSON.parse('${{ inputs.accepted-releases }}') : null,
             acceptedBackports: '${{ inputs.accepted-backports }}' ? JSON.parse('${{ inputs.accepted-backports }}') : null,
             enableFeatureBranch: '${{ inputs.enable-feature-branch }}' === 'true',
-            staleDays: '${{ inputs.stale-days }}' ? parseInt('${{ inputs.stale-days }}') : null
+            staleDays: '${{ inputs.stale-days }}' ? parseInt('${{ inputs.stale-days }}') : null,
+            enableTitleLabelSync: '${{ inputs.enable-title-label-sync }}' !== 'false'
           };
           
           try {

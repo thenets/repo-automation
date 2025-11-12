@@ -89,7 +89,8 @@ describe('RepositoryAutomation', () => {
         releaseLabeling: true,
         backportLabeling: true,
         featureBranch: true,
-        staleDetection: true
+        staleDetection: true,
+        titleLabelSync: true
       });
     });
 
@@ -103,7 +104,8 @@ describe('RepositoryAutomation', () => {
         releaseLabeling: false,
         backportLabeling: false,
         featureBranch: false,
-        staleDetection: false
+        staleDetection: false,
+        titleLabelSync: true
       });
     });
 

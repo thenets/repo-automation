@@ -1196,13 +1196,53 @@ This file contains random data, used for PR testing.
 
     def pr_has_label(self, repo_path: Path, pr_number: str, label_name: str) -> bool:
         """Check if a PR has a specific label.
-        
+
         Works with both local and fork-based PRs.
         """
         try:
             labels = self.get_pr_labels(repo_path, pr_number)
             return label_name in labels
         except subprocess.CalledProcessError:
+            return False
+
+    def update_pr_title(self, repo_path: Path, pr_number: str, new_title: str) -> bool:
+        """Update the title of a PR.
+
+        When fork repository is configured, always updates the PR in the main repository
+        since cross-repository PRs exist in the target (main) repository.
+
+        Args:
+            repo_path: Path to the repository
+            pr_number: PR number to update
+            new_title: New title for the PR
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Always target the main repository when fork is configured
+            if self.config.fork_repo:
+                main_repo_spec = f"{self.config.primary_repo.full_name}"
+                result = subprocess.run(
+                    ["gh", "pr", "edit", pr_number, "--repo", main_repo_spec, "--title", new_title],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+            else:
+                result = subprocess.run(
+                    ["gh", "pr", "edit", pr_number, "--title", new_title],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+
+            print(f"✅ Updated PR #{pr_number} title to: '{new_title}'")
+            return True
+
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to update PR #{pr_number} title: {e.stderr}")
             return False
 
     def issue_has_label(

@@ -40,19 +40,20 @@ class RepositoryAutomation {
    */
   detectEnabledFeatures() {
     const options = this.config.options;
-    
+
     const features = {
       triage: true, // Always enabled (core functionality)
       releaseLabeling: !!(options.acceptedReleases && options.acceptedReleases.length > 0),
       backportLabeling: !!(options.acceptedBackports && options.acceptedBackports.length > 0),
       featureBranch: options.enableFeatureBranch === true,
-      staleDetection: !!(options.staleDays) || this.context.eventName === 'schedule'
+      staleDetection: !!(options.staleDays) || this.context.eventName === 'schedule',
+      titleLabelSync: options.enableTitleLabelSync !== false // Enabled by default (opt-out)
     };
-    
+
     // Log enabled features
     const enabledFeatures = Object.keys(features).filter(f => features[f]);
     logger.log(`🎯 Enabled features: ${enabledFeatures.join(', ')}`);
-    
+
     return features;
   }
 
@@ -73,10 +74,15 @@ class RepositoryAutomation {
       if (this.features.releaseLabeling || this.features.backportLabeling || this.features.featureBranch) {
         await this.executeLabelAutomation();
       }
-      
+
+      // Run title-label sync feature (runs before triage automation)
+      if (this.features.titleLabelSync) {
+        await this.executeTitleLabelSync();
+      }
+
       // Run core triage automation after label automation
       await this.executeTriageAutomation();
-      
+
       if (this.features.staleDetection) {
         await this.executeStaleDetection();
       }
@@ -152,9 +158,9 @@ class RepositoryAutomation {
           // Import stale detection module when needed
           const { StaleDetection } = require('./stale-detection');
           const staleDetection = new StaleDetection(this.context, this.github, this.config.options);
-          
+
           const staleResult = await staleDetection.execute();
-          
+
           // Merge results
           this.result.labelsAdded.push(...(staleResult.labelsAdded || []));
           this.result.actions.push(...(staleResult.actions || []));
@@ -165,6 +171,91 @@ class RepositoryAutomation {
         } else {
           throw error;
         }
+      }
+    });
+  }
+
+  /**
+   * Execute title-label sync feature
+   */
+  async executeTitleLabelSync() {
+    await logger.group('🔄 Executing title-label sync...', async () => {
+      try {
+        // Only process pull_request events for title-label sync
+        if (this.context.eventName === 'pull_request') {
+          const { TitleLabelSync } = require('./title-label-sync');
+
+          // Check if this event should trigger sync
+          if (!TitleLabelSync.shouldSync(this.context)) {
+            logger.log(`ℹ️ Event action ${this.context.payload.action} does not require title-label sync`);
+            return;
+          }
+
+          const prData = this.context.payload.pull_request;
+
+          // Skip draft PRs
+          if (prData.draft) {
+            logger.log(`ℹ️ PR #${prData.number} is draft, skipping title-label sync`);
+            return;
+          }
+
+          const titleLabelSync = new TitleLabelSync(this.context, this.client, this.config);
+          const syncResult = await titleLabelSync.execute(prData);
+
+          // Merge results
+          if (syncResult.labelsAdded && syncResult.labelsAdded.length > 0) {
+            this.result.labelsAdded.push(...syncResult.labelsAdded);
+          }
+          if (syncResult.labelsRemoved && syncResult.labelsRemoved.length > 0) {
+            this.result.actions.push(`Removed labels: ${syncResult.labelsRemoved.join(', ')}`);
+          }
+          if (syncResult.titleUpdated) {
+            this.result.actions.push(`Updated PR #${prData.number} title to match labels`);
+          }
+          if (syncResult.syncPerformed) {
+            this.result.actions.push(`Title-label sync: ${syncResult.reason}`);
+          }
+        } else if (this.context.eventName === 'workflow_run') {
+          // Handle workflow_run events for fork compatibility
+          const metadata = await this.loadMetadataFromArtifact();
+
+          if (metadata && metadata.type === 'pull_request') {
+            const { TitleLabelSync } = require('./title-label-sync');
+
+            // Check if the original event action supports sync
+            const shouldSync = ['edited', 'labeled', 'unlabeled'].includes(metadata.event_action);
+            if (!shouldSync) {
+              logger.log(`ℹ️ Event action ${metadata.event_action} does not require title-label sync`);
+              return;
+            }
+
+            // Skip draft PRs
+            if (metadata.draft) {
+              logger.log(`ℹ️ PR #${metadata.number} is draft, skipping title-label sync`);
+              return;
+            }
+
+            const titleLabelSync = new TitleLabelSync(this.context, this.client, this.config);
+            const syncResult = await titleLabelSync.execute(metadata);
+
+            // Merge results
+            if (syncResult.labelsAdded && syncResult.labelsAdded.length > 0) {
+              this.result.labelsAdded.push(...syncResult.labelsAdded);
+            }
+            if (syncResult.labelsRemoved && syncResult.labelsRemoved.length > 0) {
+              this.result.actions.push(`Removed labels: ${syncResult.labelsRemoved.join(', ')}`);
+            }
+            if (syncResult.titleUpdated) {
+              this.result.actions.push(`Updated PR #${metadata.number} title to match labels`);
+            }
+            if (syncResult.syncPerformed) {
+              this.result.actions.push(`Title-label sync: ${syncResult.reason}`);
+            }
+          }
+        }
+      } catch (error) {
+        logger.error(`❌ Title-label sync failed: ${error.message}`);
+        throw error;
       }
     });
   }

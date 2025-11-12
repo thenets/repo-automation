@@ -9,6 +9,7 @@ This repository contains GitHub Actions workflows for automating repository mana
 1. **Auto-Add Triage Label**: Automatically adds "triage" label to new issues and PRs
 2. **Triage Label Protection**: Prevents removal of "triage" label unless "release-*" or "backport-*" labels are present
 3. **Stale PR Detection**: Automatically marks PRs as stale when inactive for more than 1 day
+4. **Title-Label Sync**: Bi-directional sync between PR titles and labels for POC, WIP, and HOLD status indicators
 
 ## Development Guidelines
 
@@ -63,6 +64,21 @@ make lint
    - Only adds "stale" label if not already present
    - Skips PRs that already have stale label
 
+5. **Title-Label Sync Logic**:
+   - **Title is source of truth**: Title changes always override labels
+   - Triggers on: `pull_request.edited`, `pull_request.labeled`, `pull_request.unlabeled`
+   - Supports status indicators: `[POC]`, `[WIP]`, `[HOLD]` (case-insensitive)
+   - Labels are always lowercase: `poc`, `wip`, `hold`
+   - Status brackets can appear anywhere in title
+   - Multiple indicators supported: `[WIP][HOLD] Feature`
+   - Enabled by default (opt-out with `enable-title-label-sync: false`)
+   - Skips draft PRs
+   - Implementation files:
+     - `src/title-label-sync.js` - Main sync module
+     - `src/utils/title-parser.js` - Title parsing utilities
+     - `src/utils/github-client.js` - PR title update methods
+   - Test file: `test/test_title_label_sync.py`
+
 ### Required Permissions
 GitHub Actions workflows need these permissions:
 ```yaml
@@ -108,6 +124,7 @@ permissions:
 1. **Labels**: Ensure required labels exist in repository settings:
    - "triage" (for new issues/PRs)
    - "stale" (for inactive PRs)
+   - "poc", "wip", "hold" (for title-label sync)
 2. **Actions**: Enable GitHub Actions if not already enabled
 3. **Permissions**: Verify Actions have appropriate permissions
 4. **Branch Protection**: Consider if workflows need to run on protected branches

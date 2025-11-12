@@ -89,11 +89,90 @@ class GitHubClient {
         repo: this.repo,
         pull_number: prNumber
       });
-      
+
       return pr;
-      
+
     } catch (error) {
       logger.error(`❌ Error getting PR #${prNumber}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get PR title
+   */
+  async getPRTitle(prNumber) {
+    try {
+      const pr = await this.getPR(prNumber);
+      return pr.title;
+
+    } catch (error) {
+      logger.error(`❌ Error getting PR title for #${prNumber}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Update PR title
+   */
+  async updatePRTitle(prNumber, newTitle) {
+    if (this.config.isDryRun()) {
+      logger.log(`🧪 DRY RUN: Would update PR #${prNumber} title to: "${newTitle}"`);
+      return;
+    }
+
+    try {
+      await this.github.rest.pulls.update({
+        owner: this.owner,
+        repo: this.repo,
+        pull_number: prNumber,
+        title: newTitle
+      });
+
+      logger.log(`✅ Successfully updated PR #${prNumber} title to: "${newTitle}"`);
+
+    } catch (error) {
+      logger.error(`❌ Error updating PR #${prNumber} title: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove labels from an issue or PR
+   */
+  async removeLabels(issueNumber, labels) {
+    if (this.config.isDryRun()) {
+      logger.log(`🧪 DRY RUN: Would remove labels [${labels.join(', ')}] from #${issueNumber}`);
+      return { removed: labels, skipped: false };
+    }
+
+    try {
+      const removedLabels = [];
+      for (const label of labels) {
+        try {
+          await this.github.rest.issues.removeLabel({
+            owner: this.owner,
+            repo: this.repo,
+            issue_number: issueNumber,
+            name: label
+          });
+          removedLabels.push(label);
+        } catch (error) {
+          if (error.status === 404) {
+            logger.info(`ℹ️ Label "${label}" not found on #${issueNumber} - skipping removal`);
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (removedLabels.length > 0) {
+        logger.log(`✅ Successfully removed labels [${removedLabels.join(', ')}] from #${issueNumber}`);
+      }
+      return { removed: removedLabels, skipped: false };
+
+    } catch (error) {
+      logger.error(`❌ Error removing labels from #${issueNumber}: ${error.message}`);
       throw error;
     }
   }

@@ -157,11 +157,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           custom-github-token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
           dry-run: ${{ github.event.inputs.dry-run || 'false' }}
-          
+
           # Enable all features
           accepted-releases: '["2.6", "2.7", "devel"]'
           accepted-backports: '["2.5", "2.6", "devel"]'
           enable-feature-branch: true
+          enable-title-label-sync: true  # Enabled by default
           stale-days: 5
 ```
 
@@ -315,6 +316,21 @@ jobs:
 - Runs on schedule or manual trigger
 - Skips already stale PRs
 
+### 🔄 Title-Label Sync (Bi-directional)
+- Automatically syncs PR titles and labels for POC, WIP, and HOLD status
+- **Title is source of truth**: Title changes always override labels
+- Supports multiple status indicators: `[WIP][HOLD] Feature implementation`
+- Case-insensitive matching: `[wip]`, `[WIP]`, `[Wip]` all work
+- Status brackets can appear anywhere in title: `Fix [WIP] the bug`
+- Labels are always lowercase: `poc`, `wip`, `hold`
+- Enabled by default (opt-out with `enable-title-label-sync: false`)
+
+**Examples:**
+- Create PR with `[WIP] Feature` → automatically adds `wip` label
+- Add `hold` label → title updates to include `[HOLD]`
+- Edit title to remove `[WIP]` → automatically removes `wip` label
+- Edit title to add `[POC]` → automatically adds `poc` label
+
 ### 🔒 Fork Compatibility
 - Two-workflow pattern for external contributor support
 - Secure artifact sharing between workflows
@@ -334,6 +350,7 @@ Create these labels in your repository:
 - `stale` - For inactive PRs
 - `ready for review` - For PRs ready for team review
 - `feature-branch` - For PRs requiring feature branch coordination
+- `poc`, `wip`, `hold` - For title-label sync feature (POC, WIP, HOLD status)
 
 ### Fork Compatibility Setup
 
