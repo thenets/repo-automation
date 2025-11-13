@@ -58,10 +58,10 @@ class TestBasicFunctionality(GitHubFixtures):
         print(f"Waiting for triage label to be added to PR #{pr_number}...")
         triage_added = github_manager.poll_until_condition(
             lambda: github_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,  # Wait up to 60 seconds
+            timeout=120,  # Wait up to 60 seconds
             poll_interval=5  # Check every 5 seconds
         )
-        
+
         if triage_added:
             print(f"✅ Triage label successfully added to PR #{pr_number}")
         else:
@@ -70,7 +70,7 @@ class TestBasicFunctionality(GitHubFixtures):
         # Verify the PR labels after automation runs
         labels = github_manager.get_pr_labels(repo_path, pr_number)
         print(f"PR #{pr_number} final labels: {labels}")
-        
+
         # Assert that the triage label was added (test will fail if not present)
         assert triage_added, f"Triage label was not added to PR #{pr_number} within timeout"
         assert "triage" in labels, f"Triage label not found in PR #{pr_number} labels: {labels}"

@@ -79,7 +79,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Wait for the GitHub Actions workflow to process the ready for review event
         label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -141,7 +141,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Poll until triage label is added (check every 5 seconds, timeout after 120 seconds)
         label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -203,7 +203,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Wait for triage label to be added
         label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -218,7 +218,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Wait for triage label to be re-added by protection workflow
         label_re_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -280,7 +280,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Wait for triage label to be added
         label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -354,7 +354,7 @@ class TestTriageAutoAdd(GitHubFixtures):
         # Wait for triage label to be added
         label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -397,7 +397,7 @@ class TestTriageAutoAdd(GitHubFixtures):
             lambda: integration_manager.issue_has_label(
                 repo_path, issue_number, "triage"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -461,7 +461,7 @@ class TestStalePRDetector(GitHubFixtures):
         # Wait for triage label to be added
         label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 

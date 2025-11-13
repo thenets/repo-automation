@@ -79,7 +79,7 @@ Will be updated later to add release information."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "triage"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -111,7 +111,7 @@ Now has release information, so should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-2.0"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -125,7 +125,7 @@ Now has release information, so should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "ready for review"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -200,7 +200,7 @@ Has release label from the start, should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-2.0"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -211,7 +211,7 @@ Has release label from the start, should get ready for review label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "ready for review"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -286,7 +286,7 @@ Even though it has release info, it's a draft so should not get any labels initi
 
         # Wait and verify NO labels are added to draft PR (even though it has release YAML)
         time.sleep(30)
-        
+
         draft_labels = integration_manager.get_pr_labels(repo_path, pr_number)
         assert "triage" not in draft_labels, f"Draft PR should not have triage label: {draft_labels}"
         assert "ready for review" not in draft_labels, f"Draft PR should not have ready for review label: {draft_labels}"
@@ -301,7 +301,7 @@ Even though it has release info, it's a draft so should not get any labels initi
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-1.0"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -312,7 +312,7 @@ Even though it has release info, it's a draft so should not get any labels initi
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "ready for review"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -328,4 +328,4 @@ Even though it has release info, it's a draft so should not get any labels initi
 
 
 if __name__ == '__main__':
-    pytest.main([__file__, '-v']) 
+    pytest.main([__file__, '-v'])

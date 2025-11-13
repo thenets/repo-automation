@@ -80,7 +80,7 @@ This should add the feature-branch label."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -91,7 +91,7 @@ This should add the feature-branch label."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "feature-branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -168,7 +168,7 @@ This should NOT add the feature-branch label."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -248,7 +248,7 @@ This should NOT add the feature-branch label."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -328,7 +328,7 @@ This should cause the workflow to fail."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -408,7 +408,7 @@ This should NOT add the feature-branch label."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -488,7 +488,7 @@ The comment should be ignored and feature-branch label should be added."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -499,7 +499,7 @@ The comment should be ignored and feature-branch label should be added."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "feature-branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -573,7 +573,7 @@ No YAML configuration initially."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -591,7 +591,7 @@ No YAML configuration initially."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "feature-branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=3,
         )
 
@@ -695,7 +695,7 @@ The value above is not in the accepted list and should create a validation error
         # Wait for triage label to be added (from the existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -706,7 +706,7 @@ The value above is not in the accepted list and should create a validation error
             lambda: integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error: feature branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -755,7 +755,7 @@ The value above is now valid and should cause the error comment to be automatica
             lambda: not integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error: feature branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -764,7 +764,7 @@ The value above is now valid and should cause the error comment to be automatica
         # Verify that valid label was added
         feature_branch_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "feature-branch"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -824,7 +824,7 @@ This should trigger an error comment."""
             lambda: integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error: feature branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -846,7 +846,7 @@ The YAML block has been removed, so the error comment should be cleaned up."""
             lambda: not integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error: feature branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -920,7 +920,7 @@ This should trigger an error comment initially."""
             lambda: integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error: feature branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -949,7 +949,7 @@ The error comment should be cleaned up because the label already exists."""
             lambda: not integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error: feature branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 

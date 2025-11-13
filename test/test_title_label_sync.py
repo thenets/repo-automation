@@ -48,7 +48,7 @@ class TestTitleLabelSync(GitHubFixtures):
         print(f"Waiting for wip label to be added to PR #{pr_number}...")
         wip_added = github_manager.poll_until_condition(
             lambda: github_manager.pr_has_label(repo_path, pr_number, "wip"),
-            timeout=60,
+            timeout=120,
             poll_interval=5
         )
 
@@ -61,7 +61,6 @@ class TestTitleLabelSync(GitHubFixtures):
 
         # Clean up
         github_manager.close_pr(repo_path, pr_number, delete_branch=True)
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
     @pytest.mark.fork_compatibility
     def test_title_with_multiple_indicators(self, test_repo, github_manager):
@@ -89,14 +88,14 @@ class TestTitleLabelSync(GitHubFixtures):
 
         print(f"Created PR #{pr_number} with [WIP][HOLD] in title")
 
-        # Wait for both labels
+        # Wait for both labels (longer timeout for multiple label operations)
         print(f"Waiting for wip and hold labels...")
         both_labels_added = github_manager.poll_until_condition(
             lambda: (
                 github_manager.pr_has_label(repo_path, pr_number, "wip") and
                 github_manager.pr_has_label(repo_path, pr_number, "hold")
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5
         )
 
@@ -108,7 +107,6 @@ class TestTitleLabelSync(GitHubFixtures):
 
         # Clean up
         github_manager.close_pr(repo_path, pr_number, delete_branch=True)
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
     @pytest.mark.fork_compatibility
     def test_case_insensitive_matching(self, test_repo, github_manager):
@@ -139,7 +137,7 @@ class TestTitleLabelSync(GitHubFixtures):
         # Wait for poc label
         poc_added = github_manager.poll_until_condition(
             lambda: github_manager.pr_has_label(repo_path, pr_number, "poc"),
-            timeout=60,
+            timeout=120,
             poll_interval=5
         )
 
@@ -151,7 +149,6 @@ class TestTitleLabelSync(GitHubFixtures):
 
         # Clean up
         github_manager.close_pr(repo_path, pr_number, delete_branch=True)
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
     @pytest.mark.fork_compatibility
     def test_indicators_anywhere_in_title(self, test_repo, github_manager):
@@ -182,7 +179,7 @@ class TestTitleLabelSync(GitHubFixtures):
         # Wait for wip label
         wip_added = github_manager.poll_until_condition(
             lambda: github_manager.pr_has_label(repo_path, pr_number, "wip"),
-            timeout=60,
+            timeout=120,
             poll_interval=5
         )
 
@@ -194,7 +191,6 @@ class TestTitleLabelSync(GitHubFixtures):
 
         # Clean up
         github_manager.close_pr(repo_path, pr_number, delete_branch=True)
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
     @pytest.mark.fork_compatibility
     def test_edit_title_to_remove_indicator(self, test_repo, github_manager):
@@ -225,7 +221,7 @@ class TestTitleLabelSync(GitHubFixtures):
         # Wait for wip label
         wip_added = github_manager.poll_until_condition(
             lambda: github_manager.pr_has_label(repo_path, pr_number, "wip"),
-            timeout=60,
+            timeout=120,
             poll_interval=5
         )
         assert wip_added, "Initial 'wip' label not added"
@@ -237,7 +233,7 @@ class TestTitleLabelSync(GitHubFixtures):
         # Wait for wip label to be removed
         wip_removed = github_manager.poll_until_condition(
             lambda: not github_manager.pr_has_label(repo_path, pr_number, "wip"),
-            timeout=60,
+            timeout=120,
             poll_interval=5
         )
 
@@ -249,7 +245,6 @@ class TestTitleLabelSync(GitHubFixtures):
 
         # Clean up
         github_manager.close_pr(repo_path, pr_number, delete_branch=True)
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
     @pytest.mark.fork_compatibility
     def test_edit_title_to_add_indicator(self, test_repo, github_manager):
@@ -284,7 +279,7 @@ class TestTitleLabelSync(GitHubFixtures):
         # Wait for hold label to be added
         hold_added = github_manager.poll_until_condition(
             lambda: github_manager.pr_has_label(repo_path, pr_number, "hold"),
-            timeout=60,
+            timeout=120,
             poll_interval=5
         )
 
@@ -296,7 +291,6 @@ class TestTitleLabelSync(GitHubFixtures):
 
         # Clean up
         github_manager.close_pr(repo_path, pr_number, delete_branch=True)
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)
 
     @pytest.mark.fork_compatibility
     def test_invalid_indicator_ignored(self, test_repo, github_manager):
@@ -335,4 +329,3 @@ class TestTitleLabelSync(GitHubFixtures):
 
         # Clean up
         github_manager.close_pr(repo_path, pr_number, delete_branch=True)
-        subprocess.run(["rm", "-rf", str(repo_path)], check=False)

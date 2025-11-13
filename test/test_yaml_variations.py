@@ -19,7 +19,7 @@ class TestYAMLVariations(GitHubFixtures):
         """Test that PR with quoted release/backport values works correctly.
 
         This test validates the fix for issue #65 - quoted values support.
-        
+
         Steps:
         1. Create a new branch
         2. Create a simple file change
@@ -79,7 +79,7 @@ This should work with the updated workflow."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-devel"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -87,7 +87,7 @@ This should work with the updated workflow."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport-2.2"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -110,7 +110,7 @@ This should work with the updated workflow."""
         """Test that PR with case-insensitive boolean values works correctly.
 
         This test validates the fix for issue #65 - boolean case sensitivity.
-        
+
         Steps:
         1. Create a new branch
         2. Create a simple file change
@@ -166,7 +166,7 @@ This should work with the updated workflow (False should be treated as false).""
         # We'll wait for the triage label to confirm the workflow ran
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -185,7 +185,7 @@ This should work with the updated workflow (False should be treated as false).""
         """Test that PR with mixed quote/case variations works correctly.
 
         This comprehensive test validates multiple variations in a single PR.
-        
+
         Steps:
         1. Create a new branch
         2. Create a simple file change
@@ -231,7 +231,7 @@ This file tests multiple YAML variations in one PR.
 
 ```yaml
 release: '1.0'             # Single quotes
-backport: "1.1"            # Double quotes  
+backport: "1.1"            # Double quotes
 needs_feature_branch: TRUE # Uppercase boolean
 ```
 
@@ -249,7 +249,7 @@ All these variations should be handled correctly."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-1.0"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -257,7 +257,7 @@ All these variations should be handled correctly."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport-1.1"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -265,7 +265,7 @@ All these variations should be handled correctly."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "feature-branch"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -276,7 +276,7 @@ All these variations should be handled correctly."""
         # Verify all labels are indeed present
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
         expected_labels = ["release-1.0", "backport-1.1", "feature-branch"]
-        
+
         for expected_label in expected_labels:
             assert expected_label in labels, (
                 f"Expected '{expected_label}' label on PR #{pr_number}, but got: {labels}"
@@ -289,7 +289,7 @@ All these variations should be handled correctly."""
         """Test that PR with various array syntax variations works correctly.
 
         This test validates array syntax parsing with mixed quotes and styles.
-        
+
         Steps:
         1. Create a new branch
         2. Create a simple file change
@@ -350,11 +350,11 @@ This should work with mixed quote styles and single-element arrays."""
         # Wait for all labels to be added
         expected_labels = ["release-1.0", "release-2.0", "backport-1.1"]
         labels_added = {}
-        
+
         for label in expected_labels:
             labels_added[label] = integration_manager.poll_until_condition(
                 lambda l=label: integration_manager.pr_has_label(repo_path, pr_number, l),
-                timeout=60,
+                timeout=120,
                 poll_interval=5,
             )
 
@@ -370,4 +370,4 @@ This should work with mixed quote styles and single-element arrays."""
             )
 
         # Cleanup PR
-        integration_manager.close_pr(repo_path, pr_number, delete_branch=True) 
+        integration_manager.close_pr(repo_path, pr_number, delete_branch=True)

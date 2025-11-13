@@ -83,7 +83,7 @@ The changes are backward compatible."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-2.0"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -91,7 +91,7 @@ The changes are backward compatible."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport-1.2"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -172,7 +172,7 @@ These changes are for the development branch."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-devel"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -180,7 +180,7 @@ These changes are for the development branch."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport-2.1"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -268,7 +268,7 @@ No YAML configuration initially."""
         # Wait for triage label to be added (from existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -323,7 +323,7 @@ backport: 1.1#another comment
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-1.0"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -331,7 +331,7 @@ backport: 1.1#another comment
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport-1.1"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -412,7 +412,7 @@ No backport is needed for this change."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-1.2"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -480,7 +480,7 @@ The changes are simple and don't require any specific labeling."""
         # Wait for triage label to be added (from the existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -540,7 +540,7 @@ This file contains changes to test invalid YAML handling.
         pr_body = """This PR tests that malformed YAML code blocks don't get release/backport labels.
 
 ```yaml
-release: 
+release:
 backport
 ```
 
@@ -556,7 +556,7 @@ The YAML above is malformed and should be ignored."""
         # Wait for triage label to be added (from the existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -638,7 +638,7 @@ The tags above are not in the accepted lists and should create a validation erro
         # Wait for triage label to be added (from the existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -649,7 +649,7 @@ The tags above are not in the accepted lists and should create a validation erro
             lambda: integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -703,7 +703,7 @@ The tags above are now valid and should cause the error comment to be automatica
             lambda: not integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "🚨 YAML Validation Error"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=10,
         )
 
@@ -772,7 +772,7 @@ The empty values above should be handled gracefully without workflow failure."""
         # Wait for triage label to be added (from the existing triage workflow)
         triage_label_added = integration_manager.poll_until_condition(
             lambda: integration_manager.pr_has_label(repo_path, pr_number, "triage"),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -863,7 +863,7 @@ Initial release and backport configuration."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "release-1.2"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -871,7 +871,7 @@ Initial release and backport configuration."""
             lambda: integration_manager.pr_has_label(
                 repo_path, pr_number, "backport-1.1"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -928,7 +928,7 @@ Updated release and backport configuration (should be ignored)."""
         """Test that PR with array syntax for multiple versions works correctly.
 
         This test validates the implementation of issue #358 - support for multiple versions.
-        
+
         Steps:
         1. Create a new branch
         2. Create a simple file change
@@ -992,11 +992,11 @@ This validates the implementation of issue #358."""
         # Wait for all labels to be added
         expected_labels = ["release-2.0", "release-2.1", "backport-1.4", "backport-1.5"]
         labels_added = {}
-        
+
         for label in expected_labels:
             labels_added[label] = integration_manager.poll_until_condition(
                 lambda l=label: integration_manager.pr_has_label(repo_path, pr_number, l),
-                timeout=60,
+                timeout=120,
                 poll_interval=5,
             )
 
@@ -1018,7 +1018,7 @@ This validates the implementation of issue #358."""
         """Test that PR with mixed valid/invalid array values handles errors correctly.
 
         This test validates error handling for arrays with some invalid values.
-        
+
         Steps:
         1. Create a new branch
         2. Create a simple file change
@@ -1078,7 +1078,7 @@ This should trigger validation errors for the invalid values."""
             lambda: integration_manager.pr_has_comment_containing(
                 repo_path, pr_number, "YAML Validation Error: release and backport"
             ),
-            timeout=60,
+            timeout=120,
             poll_interval=5,
         )
 
@@ -1088,7 +1088,7 @@ This should trigger validation errors for the invalid values."""
         labels = integration_manager.get_pr_labels(repo_path, pr_number)
         release_labels = [l for l in labels if l.startswith('release-')]
         backport_labels = [l for l in labels if l.startswith('backport-')]
-        
+
         assert len(release_labels) == 0, f"Expected no release labels due to validation error, but found: {release_labels}"
         assert len(backport_labels) == 0, f"Expected no backport labels due to validation error, but found: {backport_labels}"
 
